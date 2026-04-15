@@ -1,0 +1,91 @@
+import { NextResponse } from "next/server";
+import { listAgentIds, getAgentKey } from "@/lib/kv";
+import { getAgent, listAgentRuns } from "@/lib/obs";
+import { isAgentPlan } from "@/lib/agent-plan";
+import { executeAgent } from "@/lib/execution-engine";
+
+export const maxDuration = 60;
+
+// Vercel cron hits this every 5 minutes. We pick up `queued` scheduled
+// runs for KV-known agents and execute them serially. Bail before the
+// 60-second function limit; remaining runs get picked up next tick.
+export async function GET(req: Request) {
+  // Auth: Vercel sets `x-vercel-cron: 1` for cron-triggered requests.
+  // For local manual runs we also accept FORGE_CRON_SECRET via header.
+  const isVercelCron = req.headers.get("x-vercel-cron") === "1";
+  const secret = process.env.FORGE_CRON_SECRET;
+  const provided = req.headers.get("x-cron-key");
+  if (!isVercelCron && (!secret || provided !== secret)) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 403 });
+  }
+
+  const startedAt = Date.now();
+  const BAIL_AT_MS = 50_000;
+  const executed: { app_id: string; run_id: string; status: string }[] = [];
+  const skipped: string[] = [];
+
+  let agentIds: string[];
+  try {
+    agentIds = await listAgentIds();
+  } catch (e) {
+    return NextResponse.json(
+      { error: "kv_list_failed", details: String(e) },
+      { status: 500 }
+    );
+  }
+
+  for (const appId of agentIds) {
+    if (Date.now() - startedAt > BAIL_AT_MS) {
+      skipped.push(appId);
+      continue;
+    }
+    const apiKey = await getAgentKey(appId);
+    if (!apiKey) continue;
+
+    let queued;
+    try {
+      const r = await listAgentRuns(appId, apiKey, {
+        status: "queued",
+        run_type: "scheduled",
+        limit: 5,
+      });
+      queued = r.runs;
+    } catch {
+      continue;
+    }
+    if (queued.length === 0) continue;
+
+    let plan;
+    try {
+      const info = await getAgent(appId, apiKey);
+      if (!isAgentPlan(info.agent.config)) continue;
+      plan = info.agent.config;
+    } catch {
+      continue;
+    }
+
+    for (const run of queued) {
+      if (Date.now() - startedAt > BAIL_AT_MS) {
+        skipped.push(`${appId}:${run.id}`);
+        break;
+      }
+      const result = await executeAgent({
+        runId: run.id,
+        apiKey,
+        plan,
+      });
+      executed.push({ app_id: appId, run_id: run.id, status: result.status });
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    executed_count: executed.length,
+    skipped_count: skipped.length,
+    duration_ms: Date.now() - startedAt,
+    executed,
+  });
+}
+
+// Allow POST too — Vercel cron can be either depending on config.
+export const POST = GET;

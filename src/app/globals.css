@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: #faf7f2;
+  --color-foreground: #2b2b2b;
+  --color-card: #f1e9dd;
+  --color-border: #e5ddd0;
+  --color-input: #e5ddd0;
+  --color-primary: #c56a2d;
+  --color-primary-foreground: #faf7f2;
+  --color-accent: #c56a2d;
+  --color-ring: #c56a2d;
+  --color-muted-foreground: #6b6b6b;
+  --color-success: #4f8a4f;
+  --color-danger: #b3413a;
+  --radius: 0.75rem;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+}
+
+html,
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-bar {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-fadein {
+  animation: fadein 0.32s ease-out both;
+}
+
+.animate-pulse-bar {
+  animation: pulse-bar 1.6s ease-in-out infinite;
+}
+
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.btn-primary:hover {
+  background: #a85a24;
+}
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.btn-secondary:hover {
+  background: var(--color-card);
+}
+
+.input {
+  background: var(--color-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.8rem;
+  width: 100%;
+  font-size: 0.95rem;
+  color: var(--color-foreground);
+  outline: none;
+}
+.input:focus {
+  border-color: var(--color-ring);
+  box-shadow: 0 0 0 3px rgba(197, 106, 45, 0.18);
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+  margin-bottom: 0.35rem;
+  display: block;
+}
