@@ -304,6 +304,7 @@ export function Step5Test({
         appId={appId}
         runId={runId}
         onTerminal={(s) => setTerminal(s)}
+        truncateNames
       />
 
       {terminal && (

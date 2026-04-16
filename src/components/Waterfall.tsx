@@ -8,9 +8,10 @@ interface Props {
   appId: string;
   runId: string;
   onTerminal?: (status: "completed" | "failed") => void;
+  truncateNames?: boolean;
 }
 
-export function Waterfall({ appId, runId, onTerminal }: Props) {
+export function Waterfall({ appId, runId, onTerminal, truncateNames = false }: Props) {
   const [steps, setSteps] = useState<RunStep[]>([]);
   const [status, setStatus] = useState<RunStatus>("queued");
   const [selectedName, setSelectedName] = useState<string | null>(null);
@@ -91,7 +92,11 @@ export function Waterfall({ appId, runId, onTerminal }: Props) {
                 onClick={() => setSelectedName(g.name)}
               >
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold">{g.name}</span>
+                  <span className="font-semibold" title={g.name}>
+                    {truncateNames && g.name.length > 18
+                      ? g.name.slice(0, 18) + "…"
+                      : g.name}
+                  </span>
                   <span className="font-mono text-xs text-[color:var(--color-muted-foreground)]">
                     {g.duration != null ? formatDuration(g.duration) : "…"}
                   </span>
