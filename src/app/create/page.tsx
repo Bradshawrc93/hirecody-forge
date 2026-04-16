@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
 import { BackButton } from "@/components/BackButton";
 import { StepIndicator } from "@/components/CreateFlow/StepIndicator";
 import { Step1Describe } from "@/components/CreateFlow/Step1Describe";
@@ -19,7 +18,22 @@ export default function CreatePage() {
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [created, setCreated] = useState<{ app_id: string; slug: string } | null>(null);
-  const [rebuilding, setRebuilding] = useState(false);
+  const [pendingFeedback, setPendingFeedback] = useState<string | null>(null);
+  const [buildAttempt, setBuildAttempt] = useState(0);
+  const [attemptNumber, setAttemptNumber] = useState<1 | 2>(1);
+  const buildPromiseRef = useRef<Promise<{ app_id: string; slug: string } | null> | null>(null);
+
+  async function deleteAgentById(appId: string) {
+    try {
+      await fetch("/api/internal/delete-agent", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ app_id: appId }),
+      });
+    } catch {
+      /* best-effort cleanup */
+    }
+  }
 
   // Clone support: read sessionStorage on mount.
   useEffect(() => {
@@ -40,36 +54,37 @@ export default function CreatePage() {
     }
   }, []);
 
-  async function rebuildAfterFeedback(feedback: string) {
+  async function deleteCreatedAgent() {
     if (!created) return;
-    setRebuilding(true);
-    try {
-      const res = await fetch("/api/internal/rebuild", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          app_id: created.app_id,
-          user_feedback: feedback,
-          display_name: form.display_name,
-          description: form.description,
-          needs_llm: form.needs_llm,
-          model: form.model,
-          input_type: form.input_type,
-          can_send_email: form.can_send_email,
-          has_web_access: form.has_web_access,
-          output_type: form.output_type,
-          success_criteria: form.success_criteria,
-          context_text: form.context_text || null,
-          verified_email: form.verified_email,
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json();
-        alert("Rebuild failed: " + (body.details || body.error));
-      }
-    } finally {
-      setRebuilding(false);
+    await deleteAgentById(created.app_id);
+  }
+
+  async function handleRebuild(feedback: string) {
+    if (!created) return;
+    // In-place rebuild: keep the same app_id/slug. Step4Build will hit
+    // the rebuild endpoint, which patches the existing agent's config
+    // and posts a new build record as attempt_number 2.
+    setPendingFeedback(feedback);
+    setAttemptNumber(2);
+    setBuildAttempt((n) => n + 1);
+    setStep(4);
+  }
+
+  async function handleAbandon() {
+    await deleteCreatedAgent();
+    router.push("/");
+  }
+
+  async function handleCancel() {
+    if (created) {
+      await deleteCreatedAgent();
+    } else if (buildPromiseRef.current) {
+      // A build is in-flight. Wait for it to land so we can delete the
+      // orphaned agent the backend will have created.
+      const result = await buildPromiseRef.current.catch(() => null);
+      if (result?.app_id) await deleteAgentById(result.app_id);
     }
+    router.push("/");
   }
 
   return (
@@ -78,17 +93,17 @@ export default function CreatePage() {
 
       <div className="mx-auto max-w-2xl px-4 pt-16 pb-12">
         <div className="card relative p-6 md:p-8">
-          <button
-            type="button"
-            className="absolute right-4 top-4 text-[color:var(--color-muted-foreground)] hover:text-[color:var(--color-foreground)]"
-            onClick={() => router.push("/")}
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
-
-          <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-xl font-bold">Create Agent</h1>
+          <div className="mb-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="text-xl font-bold">Create Agent</h1>
+              <button
+                type="button"
+                className="rounded-md border border-[#C56A2D] bg-transparent px-3 py-1.5 text-sm font-semibold text-[#C56A2D] transition-colors hover:bg-[#C56A2D] hover:text-white"
+                onClick={handleCancel}
+              >
+                Cancel
+              </button>
+            </div>
             <StepIndicator step={step} />
           </div>
 
@@ -115,31 +130,34 @@ export default function CreatePage() {
               onBack={() => setStep(2)}
             />
           )}
-          {step === 4 && !rebuilding && (
+          {step === 4 && (
             <Step4Build
+              key={buildAttempt}
               form={form}
+              userFeedback={pendingFeedback}
+              mode={attemptNumber === 2 ? "rebuild" : "initial"}
+              appId={created?.app_id ?? null}
+              onBuildStarted={(p) => {
+                buildPromiseRef.current = p;
+              }}
               onSuccess={(r) => {
+                buildPromiseRef.current = null;
                 setCreated(r);
                 setStep(5);
               }}
               onRetry={() => setStep(3)}
             />
           )}
-          {step === 4 && rebuilding && (
-            <div className="py-8 text-center text-sm">Rebuilding with your feedback…</div>
-          )}
           {step === 5 && created && (
             <Step5Test
+              key={attemptNumber}
               appId={created.app_id}
               slug={created.slug}
               form={form}
+              attemptNumber={attemptNumber}
               onLive={() => router.push(`/agents/${created.slug}`)}
-              onRebuild={async (fb) => {
-                setStep(4);
-                await rebuildAfterFeedback(fb);
-                setStep(5);
-              }}
-              onAbandon={() => router.push("/")}
+              onRebuild={handleRebuild}
+              onAbandon={handleAbandon}
             />
           )}
         </div>

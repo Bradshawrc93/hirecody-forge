@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Calendar, Mail, ThumbsUp } from "lucide-react";
+import { Calendar, Mail } from "lucide-react";
 import type { AgentRecord } from "@/lib/obs";
 import { relativeTime, truncate } from "@/lib/format";
 import { StatusBadge } from "./StatusBadge";
@@ -11,7 +11,7 @@ export function AgentCard({ agent }: { agent: AgentRecord }) {
     agent.status === "building" || agent.status === "awaiting_test";
   const lastRun = agent.last_run_at;
   const lastRunStrip = lastRun
-    ? agent.output_type === "email"
+    ? agent.can_send_email
       ? `Delivered • ${relativeTime(lastRun)}`
       : `Completed • ${relativeTime(lastRun)}`
     : null;
@@ -41,14 +41,11 @@ export function AgentCard({ agent }: { agent: AgentRecord }) {
             <Calendar size={12} /> {agent.schedule_cadence}
           </span>
         )}
-        {agent.output_type === "email" && (
+        {agent.can_send_email && (
           <span className="inline-flex items-center gap-1">
             <Mail size={12} /> email
           </span>
         )}
-        <span className="inline-flex items-center gap-1">
-          <ThumbsUp size={12} />
-        </span>
       </div>
       {lastRunStrip && !isPulsing && (
         <div className="mt-4 border-t border-[color:var(--color-border)] pt-3 text-xs text-[color:var(--color-muted-foreground)]">

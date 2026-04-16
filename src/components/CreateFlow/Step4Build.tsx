@@ -1,64 +1,106 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormState } from "./types";
 
 interface Props {
   form: FormState;
+  userFeedback?: string | null;
   onSuccess: (result: { app_id: string; slug: string }) => void;
   onRetry: () => void;
+  onBuildStarted?: (
+    promise: Promise<{ app_id: string; slug: string } | null>
+  ) => void;
+  // When rebuilding an existing agent in place, set mode="rebuild" and
+  // pass the existing appId. The component will hit the rebuild endpoint
+  // instead of creating a new agent.
+  mode?: "initial" | "rebuild";
+  appId?: string | null;
 }
 
-const STATUS_MESSAGES = [
-  "Analyzing your request...",
-  "Designing agent steps...",
-  "Generating configuration...",
-  "Wiring up telemetry...",
+const PULSE_PHRASES = [
+  "Good things come to those who wait…",
+  "Measuring twice, cutting once…",
+  "Teaching the robot some manners…",
+  "Brewing something good…",
+  "Almost there — hang tight…",
+  "Turning vibes into JSON…",
 ];
 
-export function Step4Build({ form, onSuccess, onRetry }: Props) {
-  const [statusIdx, setStatusIdx] = useState(0);
+export function Step4Build({
+  form,
+  userFeedback,
+  onSuccess,
+  onRetry,
+  onBuildStarted,
+  mode = "initial",
+  appId,
+}: Props) {
+  const [phraseIdx, setPhraseIdx] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
     const t = setInterval(() => {
-      setStatusIdx((i) => (i + 1) % STATUS_MESSAGES.length);
-    }, 1400);
+      setPhraseIdx((i) => (i + 1) % PULSE_PHRASES.length);
+    }, 2800);
     return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    const startedAt = Date.now();
+    const t = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    // Note: we intentionally do NOT gate onSuccess / setError on a
+    // closure-captured `cancelled` flag. React 18 Strict Mode runs the
+    // cleanup between the two dev-mode effect invocations, which would
+    // stick `cancelled = true` even though the component is still mounted,
+    // hanging the spinner forever when the fetch eventually resolves.
+    // Real cancellation is handled by the parent via the onBuildStarted
+    // promise ref — it awaits the in-flight build and deletes any orphan.
+    const promise = (async () => {
       try {
-        const res = await fetch("/api/internal/build-agent", {
+        const endpoint =
+          mode === "rebuild"
+            ? "/api/internal/rebuild-agent"
+            : "/api/internal/build-agent";
+        const payload =
+          mode === "rebuild"
+            ? { app_id: appId, user_feedback: userFeedback ?? "" }
+            : { ...form, user_feedback: userFeedback ?? null };
+        const res = await fetch(endpoint, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
         const body = await res.json();
-        if (cancelled) return;
         if (!res.ok) {
-          setError(
-            body.details || body.error || "The builder hit an error."
-          );
-          return;
+          setError(body.details || body.error || "The builder hit an error.");
+          return null;
         }
-        onSuccess({ app_id: body.app_id, slug: body.slug });
+        const result = { app_id: body.app_id, slug: body.slug };
+        onSuccess(result);
+        return result;
       } catch (e) {
-        if (!cancelled) setError(String(e));
+        setError(String(e));
+        return null;
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    onBuildStarted?.(promise);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (error) {
     return (
       <div className="space-y-4 text-center">
-        <div className="text-2xl">😬</div>
         <h3 className="text-lg font-semibold">The build hit an error</h3>
         <p className="text-sm text-[color:var(--color-muted-foreground)]">{error}</p>
         <button type="button" className="btn-primary" onClick={onRetry}>
@@ -68,17 +110,33 @@ export function Step4Build({ form, onSuccess, onRetry }: Props) {
     );
   }
 
+  const slow = elapsed >= 45;
+  const veryLong = elapsed >= 120;
+
   return (
-    <div className="space-y-6 py-8 text-center">
-      <div className="mx-auto h-2 w-48 overflow-hidden rounded-full bg-[color:var(--color-card)]">
-        <div className="h-full w-1/3 animate-pulse-bar bg-[#C56A2D]" />
-      </div>
-      <p className="text-base font-medium animate-fadein" key={statusIdx}>
-        {STATUS_MESSAGES[statusIdx]}
+    <div className="space-y-6 py-12 text-center">
+      <p
+        key={phraseIdx}
+        className="text-base font-medium animate-pulse-text"
+      >
+        {PULSE_PHRASES[phraseIdx]}
       </p>
       <p className="text-xs text-[color:var(--color-muted-foreground)]">
-        Sonnet 4.6 is generating your agent. This usually takes 10–20 seconds.
+        This usually takes 10–20 seconds, but may take up to a couple minutes.
       </p>
+      <p className="font-mono text-xs text-[color:var(--color-muted-foreground)]">
+        still working · {elapsed}s elapsed
+      </p>
+      {slow && !veryLong && (
+        <p className="text-xs text-[#C56A2D]">
+          Taking longer than usual — still connected, hang tight.
+        </p>
+      )}
+      {veryLong && (
+        <p className="text-xs text-[#B3413A]">
+          Over 2 minutes. The builder may be hung — you can cancel and retry.
+        </p>
+      )}
     </div>
   );
 }

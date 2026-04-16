@@ -15,6 +15,7 @@ export interface BuilderInput {
   output_type: "text" | "file" | "email" | "notification" | "side-effect";
   verified_email?: string | null;
   user_feedback?: string | null;
+  previous_plan?: AgentPlan | null;
 }
 
 const SYSTEM = `You are an agent designer for a lightweight automation platform. Given a user's plain-English description plus a structured form, produce a JSON "plan" that the execution engine will run.
@@ -23,15 +24,16 @@ The plan must use ONLY these step types:
 - "llm": calls an LLM. Fields: name, prompt, optional output_var, optional max_tokens (default 1024).
 - "web_fetch": HTTP GET to a public URL. Fields: name, url, optional output_var. Only allowed when has_web_access is true.
 - "file_read": reads the user-provided input file. Fields: name, optional output_var. Only allowed when input_type is "file" or "both".
-- "email": sends an email to the verified address. Fields: name, subject_template, body_template. Only allowed when can_send_email is true.
-- "output": final output rendered for the user. Fields: name, template. Required.
+- "email": sends an email to the verified address. Fields: name, subject_template, body_template. Only allowed when can_send_email is true. The subject_template MUST be a short one-line string (under ~80 chars) — typically a literal title, optionally with {{input_text}} or a short variable. NEVER reference the long body/output variable in subject_template: email providers reject subjects containing newlines.
+- "output": final markdown rendered for the user. Fields: name, template. Required.
 
 Templates may reference prior step outputs via {{output_var}}, the user input as {{input_text}}, and the file contents as {{file_text}}.
 
 Constraints:
 - 1 to 5 steps total.
 - Use the user's selected runtime model in the top-level "model" field.
-- Always include exactly one terminal step that surfaces the result (either "output", or "email" when output_type is "email").
+- Always include an "output" step that renders the final result as markdown.
+- If can_send_email is true, also include an "email" step that sends the same rendered markdown to the verified address (its body_template should reference the output step's result).
 - Keep prompts concise and grounded in the success criteria.
 
 Respond with ONLY a JSON object, no prose:
@@ -62,21 +64,32 @@ export async function buildAgentPlan(input: BuilderInput): Promise<{
     user_feedback: input.user_feedback ?? null,
   };
 
+  const userMessage = input.user_feedback
+    ? `This is a REBUILD attempt. The previous build did not meet the user's expectations.${
+        input.previous_plan
+          ? `\n\nHere is the exact plan you generated previously (so you can see what to change):\n\n\`\`\`json\n${JSON.stringify(
+              input.previous_plan,
+              null,
+              2
+            )}\n\`\`\``
+          : ""
+      }\n\nThe user's feedback on what was wrong:\n\n"""\n${input.user_feedback}\n"""\n\nGenerate a revised plan that directly addresses this feedback. Do not simply repeat the previous plan.\n\nOriginal request:\n\n${JSON.stringify(
+        userPayload,
+        null,
+        2
+      )}`
+    : `Build an agent plan for this request:\n\n${JSON.stringify(
+        userPayload,
+        null,
+        2
+      )}`;
+
   const start = Date.now();
   const res = await anthropic().messages.create({
     model: BUILDER_MODEL,
     max_tokens: 2048,
     system: SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: `Build an agent plan for this request:\n\n${JSON.stringify(
-          userPayload,
-          null,
-          2
-        )}`,
-      },
-    ],
+    messages: [{ role: "user", content: userMessage }],
   });
   const durationMs = Date.now() - start;
 

@@ -6,7 +6,7 @@ import { StatusBadge, RunStatusBadge } from "@/components/StatusBadge";
 import { findAgentBySlug } from "@/lib/agent-lookup";
 import { getAgent, listAgentRuns } from "@/lib/obs";
 import { getAgentKey } from "@/lib/kv";
-import { formatDuration, relativeTime, formatCost } from "@/lib/format";
+import { formatDuration, relativeTime, formatCost, formatScheduleTimeCT } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -50,7 +50,13 @@ export default async function AgentDetailPage({
       <BackButton />
 
       <div className="mx-auto max-w-5xl px-6 pt-16 pb-16">
-        <header className="border-b border-[color:var(--color-border)] pb-6">
+        <Link
+          href="/"
+          className="text-sm font-semibold text-[color:var(--color-primary)] hover:underline"
+        >
+          ← back to Forge
+        </Link>
+        <header className="mt-4 border-b border-[color:var(--color-border)] pb-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold">{app.display_name}</h1>
@@ -66,7 +72,7 @@ export default async function AgentDetailPage({
                 )}
                 {agent.schedule_cadence && (
                   <span className="text-[color:var(--color-muted-foreground)]">
-                    {agent.schedule_cadence} @ {agent.schedule_time}
+                    {agent.schedule_cadence} @ {formatScheduleTimeCT(agent.schedule_time)}
                   </span>
                 )}
               </div>
@@ -112,7 +118,6 @@ export default async function AgentDetailPage({
                   <div className="mt-2 flex gap-4 text-xs text-[color:var(--color-muted-foreground)]">
                     <span>{formatDuration(latest.duration_ms)}</span>
                     <span>{formatCost(latest.cost_usd)}</span>
-                    {latest.user_rating && <span>👍 {latest.user_rating}</span>}
                   </div>
                 </Link>
               ) : (
@@ -157,10 +162,10 @@ export default async function AgentDetailPage({
           <aside className="card h-fit space-y-2 p-4 text-xs">
             <Row label="Model" value={agent.model ?? "—"} />
             <Row label="Input" value={agent.input_type ?? "none"} />
-            <Row label="Output" value={agent.output_type ?? "text"} />
+            <Row label="Email" value={agent.can_send_email ? "yes" : "no"} />
             <Row label="Created" value={relativeTime(agent.created_at)} />
             <Row label="Expires" value={relativeTime(agent.expires_at)} />
-            <Row label="App ID" value={app.id} mono />
+            <Row label="App ID" value={app.id.slice(0, 8)} mono />
           </aside>
         </div>
       </div>
@@ -170,9 +175,13 @@ export default async function AgentDetailPage({
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-2">
-      <span className="text-[color:var(--color-muted-foreground)]">{label}</span>
-      <span className={mono ? "truncate font-mono" : "truncate"}>{value}</span>
+    <div className="flex items-baseline justify-between gap-2 whitespace-nowrap">
+      <span className="shrink-0 text-[color:var(--color-muted-foreground)]">
+        {label}
+      </span>
+      <span className={`min-w-0 truncate ${mono ? "font-mono" : ""}`}>
+        {value}
+      </span>
     </div>
   );
 }

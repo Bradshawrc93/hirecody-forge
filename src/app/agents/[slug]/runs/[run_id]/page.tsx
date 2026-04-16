@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { BackButton } from "@/components/BackButton";
+import { LiveRunView } from "@/components/LiveRunView";
+import { MarkdownView } from "@/components/MarkdownView";
+import { Waterfall } from "@/components/Waterfall";
 import { RunStatusBadge } from "@/components/StatusBadge";
 import { findAgentBySlug } from "@/lib/agent-lookup";
 import { getRun, getSteps } from "@/lib/obs";
@@ -23,10 +26,11 @@ export default async function RunDetailPage({
   const apiKey = await getAgentKey(lean.app_id);
   if (!apiKey) notFound();
 
-  const [{ run }, stepsResp] = await Promise.all([
-    getRun(run_id, apiKey),
-    getSteps(run_id, apiKey, 0),
-  ]);
+  const { run } = await getRun(run_id, apiKey);
+  const isLive = run.status === "queued" || run.status === "running";
+  const stepsResp = isLive
+    ? { steps: [] }
+    : await getSteps(run_id, apiKey, 0);
 
   const failureSummary =
     run.status === "failed"
@@ -77,50 +81,33 @@ export default async function RunDetailPage({
           </div>
         )}
 
-        <section className="mt-6">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-[color:var(--color-muted-foreground)]">
-            Output
-          </h2>
-          <pre className="card mt-2 max-h-[400px] overflow-auto whitespace-pre-wrap p-4 text-sm">
-            {run.output ?? run.error_message ?? "(no output)"}
-          </pre>
-        </section>
+        {isLive ? (
+          <LiveRunView appId={lean.app_id} runId={run_id} />
+        ) : (
+          <>
+            <section className="mt-6">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-[color:var(--color-muted-foreground)]">
+                Output
+              </h2>
+              <div className="card mt-2 max-h-[400px] overflow-auto p-4">
+                {run.status === "completed" && run.output ? (
+                  <MarkdownView content={run.output} />
+                ) : (
+                  <pre className="whitespace-pre-wrap text-sm">
+                    {run.output ?? run.error_message ?? "(no output)"}
+                  </pre>
+                )}
+              </div>
+            </section>
 
-        <section className="mt-8">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[color:var(--color-muted-foreground)]">
-            Waterfall
-          </h2>
-          <ol className="space-y-2">
-            {stepsResp.steps.map((s) => (
-              <li
-                key={s.id}
-                className="card flex items-center justify-between p-3 text-sm"
-              >
-                <div>
-                  <div className="font-semibold">{s.step_name}</div>
-                  <div className="text-xs text-[color:var(--color-muted-foreground)]">
-                    {s.service} • {s.event_type}
-                  </div>
-                </div>
-                <div className="text-right text-xs">
-                  {s.duration_ms != null && (
-                    <div className="font-mono">{formatDuration(s.duration_ms)}</div>
-                  )}
-                  {s.event_ref && (
-                    <a
-                      href={`https://obs.hirecody.dev/events/${s.event_ref}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-semibold text-[color:var(--color-primary)] hover:underline"
-                    >
-                      View on Obs →
-                    </a>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
+            <section className="mt-8">
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[color:var(--color-muted-foreground)]">
+                Waterfall
+              </h2>
+              <Waterfall appId={lean.app_id} runId={run_id} />
+            </section>
+          </>
+        )}
       </div>
     </main>
   );

@@ -1,6 +1,8 @@
+import { marked } from "marked";
 import { anthropic } from "./anthropic";
 import { openai } from "./openai";
 import {
+  emailSendResult,
   patchRun,
   postEvent,
   postStep,
@@ -11,6 +13,14 @@ import type { AgentPlan, PlanStep } from "./agent-plan";
 // Tiny templating: replace {{var}} with the variable bag.
 function render(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, k) => vars[k] ?? "");
+}
+
+// Wrap rendered markdown HTML in a minimal email-safe shell with
+// inline-ish styles. Keeps headings/bold/lists readable in Gmail, Apple
+// Mail, and Outlook without pulling in a templating library.
+function markdownToEmailHtml(md: string): string {
+  const inner = marked.parse(md, { async: false, gfm: true, breaks: true }) as string;
+  return `<!doctype html><html><body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a;background:#ffffff;"><div style="max-width:640px;margin:0 auto;">${inner}</div></body></html>`;
 }
 
 interface ExecutionInput {
@@ -147,13 +157,35 @@ export async function executeAgent(
     for (const step of plan.steps) {
       const stepStart = Date.now();
 
-      // start event
+      // Build a richer start metadata payload so the waterfall can show
+      // something useful while the step is still running.
+      const startMeta: Record<string, unknown> = { type: step.type };
+      if (step.type === "llm") {
+        const renderedPrompt = render(step.prompt, vars);
+        startMeta.model = plan.model;
+        startMeta.prompt_preview = renderedPrompt.slice(0, 800);
+        startMeta.prompt_chars = renderedPrompt.length;
+        if (step.max_tokens) startMeta.max_tokens = step.max_tokens;
+        if (step.output_var) startMeta.output_var = step.output_var;
+      } else if (step.type === "web_fetch") {
+        startMeta.url = render(step.url, vars);
+        if (step.output_var) startMeta.output_var = step.output_var;
+      } else if (step.type === "email") {
+        startMeta.to = verifiedEmail ?? null;
+        startMeta.subject_preview = render(step.subject_template, vars).slice(0, 200);
+      } else if (step.type === "output") {
+        startMeta.template_preview = render(step.template, vars).slice(0, 400);
+      } else if (step.type === "file_read") {
+        startMeta.bytes = (fileText ?? "").length;
+        if (step.output_var) startMeta.output_var = step.output_var;
+      }
+
       await postStep(runId, apiKey, {
         step_name: step.name,
         service: step.type,
         event_type: "start",
         started_at: new Date(stepStart).toISOString(),
-        metadata: { type: step.type },
+        metadata: startMeta,
       }).catch(() => undefined);
 
       try {
@@ -175,29 +207,45 @@ export async function executeAgent(
           producedOutput = fileText ?? "";
           if (step.output_var) vars[step.output_var] = producedOutput;
         } else if (step.type === "email") {
-          const subject = render(step.subject_template, vars);
-          const bodyText = render(step.body_template, vars);
-          // Email sending is stubbed in v1 — Obs will own delivery via
-          // its existing email pipeline. For now we just record what
-          // would be sent and surface it as the run output.
-          producedOutput = `📧 To: ${verifiedEmail ?? "(no verified email)"}\nSubject: ${subject}\n\n${bodyText}`;
+          const rawSubject = render(step.subject_template, vars);
+          const subject = rawSubject.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+          const bodyMarkdown = render(step.body_template, vars);
+          const bodyHtml = markdownToEmailHtml(bodyMarkdown);
+          const sendRes = await emailSendResult(apiKey, {
+            subject,
+            body: bodyHtml,
+            format: "html",
+          });
+          producedOutput = `To: ${verifiedEmail ?? "(no verified email)"}\nSubject: ${subject}\n\n${bodyMarkdown}`;
           finalOutput = producedOutput;
+          eventRef = sendRes.message_id;
         } else if (step.type === "output") {
           producedOutput = render(step.template, vars);
           finalOutput = producedOutput;
         }
 
         const stepDuration = Date.now() - stepStart;
+        const completeMeta: Record<string, unknown> = {
+          type: step.type,
+          output_preview: producedOutput?.slice(0, 1200) ?? "",
+          output_chars: producedOutput?.length ?? 0,
+        };
+        if (step.type === "llm") {
+          // tokens/cost are recorded on the run; nothing extra to carry here
+          // since the live run already folds these into the totals — but we
+          // do want the prompt too, so re-attach it for the detail panel.
+          completeMeta.prompt_preview = render(step.prompt, vars).slice(0, 800);
+          completeMeta.model = plan.model;
+        } else if (step.type === "web_fetch") {
+          completeMeta.url = render(step.url, vars);
+        }
         await postStep(runId, apiKey, {
           step_name: step.name,
           service: step.type,
           event_type: "complete",
           completed_at: new Date().toISOString(),
           duration_ms: stepDuration,
-          metadata: {
-            type: step.type,
-            preview: producedOutput?.slice(0, 200),
-          },
+          metadata: completeMeta,
           ...(eventRef ? { event_ref: eventRef } : {}),
         }).catch(() => undefined);
       } catch (stepErr) {

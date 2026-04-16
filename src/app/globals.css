@@ -47,12 +47,26 @@ body {
   }
 }
 
+@keyframes pulse-text {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .animate-fadein {
   animation: fadein 0.32s ease-out both;
 }
 
 .animate-pulse-bar {
   animation: pulse-bar 1.6s ease-in-out infinite;
+}
+
+.animate-pulse-text {
+  animation: pulse-text 2.8s ease-in-out infinite;
 }
 
 .card {
@@ -88,6 +102,25 @@ body {
 }
 .btn-secondary:hover {
   background: var(--color-card);
+}
+
+.btn-toggle {
+  background: transparent;
+  color: var(--color-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.5rem 1.1rem;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn-toggle:hover {
+  background: var(--color-card);
+}
+.btn-toggle[data-active="true"] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+  font-weight: 600;
 }
 
 .input {

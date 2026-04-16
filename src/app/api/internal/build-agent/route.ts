@@ -33,6 +33,7 @@ interface RequestBody {
   success_criteria: string;
   output_type: "text" | "file" | "email" | "notification" | "side-effect";
   context_text: string | null;
+  user_feedback?: string | null;
 }
 
 export async function POST(req: Request) {
@@ -59,10 +60,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const slug = body.slug?.trim() || slugify(body.display_name);
+  const baseSlug = body.slug?.trim() || slugify(body.display_name);
 
   const createPayload: CreateAgentInput = {
-    slug,
+    slug: baseSlug,
     display_name: body.display_name,
     description: body.description,
     config: {},
@@ -81,14 +82,34 @@ export async function POST(req: Request) {
     verified_email: body.verified_email,
   };
 
+  // Retry with -2, -3, ... if the slug collides with a soft-deleted
+  // agent that's still holding the unique-key row on apps.slug.
+  function isDupSlug(err: ObsError): boolean {
+    const blob = typeof err.body === "string" ? err.body : JSON.stringify(err.body ?? "");
+    return /apps_slug_key|duplicate key|already exists/i.test(blob);
+  }
+
   let app: { id: string; slug: string; display_name: string };
   let agent: AgentRecord;
   let apiKey: string;
   try {
-    const created = await createAgent(createPayload);
-    app = created.app;
-    agent = created.agent;
-    apiKey = created.api_key;
+    let attempt = 0;
+    while (true) {
+      try {
+        const created = await createAgent(createPayload);
+        app = created.app;
+        agent = created.agent;
+        apiKey = created.api_key;
+        break;
+      } catch (e) {
+        if (e instanceof ObsError && isDupSlug(e) && attempt < 20) {
+          attempt += 1;
+          createPayload.slug = `${baseSlug}-${attempt + 1}`;
+          continue;
+        }
+        throw e;
+      }
+    }
   } catch (e) {
     if (e instanceof ObsError) {
       return NextResponse.json(e.body, { status: e.status });
@@ -122,6 +143,7 @@ export async function POST(req: Request) {
       has_web_access: body.has_web_access,
       output_type: body.output_type,
       verified_email: body.verified_email,
+      user_feedback: body.user_feedback ?? null,
     });
   } catch (e) {
     // Log the failed build attempt.

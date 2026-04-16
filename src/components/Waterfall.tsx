@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RunStep, RunStatus } from "@/lib/obs";
 import { formatDuration } from "@/lib/format";
 
@@ -13,7 +13,7 @@ interface Props {
 export function Waterfall({ appId, runId, onTerminal }: Props) {
   const [steps, setSteps] = useState<RunStep[]>([]);
   const [status, setStatus] = useState<RunStatus>("queued");
-  const [selected, setSelected] = useState<RunStep | null>(null);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
   const sinceRef = useRef(0);
   const stoppedRef = useRef(false);
 
@@ -57,10 +57,11 @@ export function Waterfall({ appId, runId, onTerminal }: Props) {
     };
   }, [appId, runId, onTerminal]);
 
-  const grouped = groupSteps(steps);
+  const grouped = useMemo(() => groupSteps(steps), [steps]);
+  const selected = grouped.find((g) => g.name === selectedName) ?? null;
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_280px]">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_320px]">
       <div className="card max-h-[60vh] overflow-y-auto p-4">
         <div className="mb-3 flex items-center justify-between text-xs">
           <span className="font-mono text-[color:var(--color-muted-foreground)]">
@@ -85,9 +86,9 @@ export function Waterfall({ appId, runId, onTerminal }: Props) {
               <li
                 key={g.name + g.startSeq}
                 className={`animate-fadein cursor-pointer rounded-md border-l-4 bg-[color:var(--color-background)] px-3 py-2 ${stateColor} ${
-                  selected?.id === g.startEvent.id ? "ring-2 ring-[#C56A2D]" : ""
+                  selectedName === g.name ? "ring-2 ring-[#C56A2D]" : ""
                 }`}
-                onClick={() => setSelected(g.completeEvent ?? g.startEvent)}
+                onClick={() => setSelectedName(g.name)}
               >
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-semibold">{g.name}</span>
@@ -104,40 +105,164 @@ export function Waterfall({ appId, runId, onTerminal }: Props) {
         </ol>
       </div>
 
-      <aside className="card p-4 text-sm">
+      <aside className="card max-h-[60vh] overflow-auto p-4 text-sm">
         {selected ? (
-          <div className="space-y-2">
-            <div className="font-semibold">{selected.step_name}</div>
-            <div className="text-xs text-[color:var(--color-muted-foreground)]">
-              {selected.service} • {selected.event_type}
-            </div>
-            {selected.duration_ms != null && (
-              <div className="text-xs">
-                Duration: {formatDuration(selected.duration_ms)}
-              </div>
-            )}
-            {selected.event_ref && (
-              <a
-                href={`https://obs.hirecody.dev/events/${selected.event_ref}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block text-xs font-semibold text-[color:var(--color-primary)] hover:underline"
-              >
-                View on Obs →
-              </a>
-            )}
-            {selected.metadata && (
-              <pre className="mt-2 max-h-48 overflow-auto rounded bg-[color:var(--color-card)] p-2 text-[10px]">
-                {JSON.stringify(selected.metadata, null, 2)}
-              </pre>
-            )}
-          </div>
+          <StepDetail group={selected} />
         ) : (
           <p className="text-xs text-[color:var(--color-muted-foreground)]">
             Click a step to see details.
           </p>
         )}
       </aside>
+    </div>
+  );
+}
+
+function StepDetail({ group }: { group: GroupedStep }) {
+  const completeMeta = (group.completeEvent?.metadata ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const startMeta = (group.startEvent.metadata ?? {}) as Record<string, unknown>;
+  const meta = { ...startMeta, ...completeMeta };
+  const service = group.service;
+  const stateLabel =
+    group.state === "complete"
+      ? "completed"
+      : group.state === "fail"
+      ? "failed"
+      : "running";
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <div className="font-semibold">{group.name}</div>
+        <div className="text-xs text-[color:var(--color-muted-foreground)]">
+          {service} • {stateLabel}
+          {group.duration != null && <> • {formatDuration(group.duration)}</>}
+        </div>
+      </div>
+
+      {service === "llm" && (
+        <>
+          {typeof meta.model === "string" && (
+            <DetailRow label="Model" value={meta.model} mono />
+          )}
+          {typeof meta.prompt_preview === "string" && (
+            <DetailBlock label="Prompt" text={meta.prompt_preview} />
+          )}
+          {typeof meta.output_preview === "string" && (
+            <DetailBlock label="Output" text={meta.output_preview} />
+          )}
+        </>
+      )}
+
+      {service === "web_fetch" && (
+        <>
+          {typeof meta.url === "string" && (
+            <DetailRow label="URL" value={meta.url} mono wrap />
+          )}
+          {typeof meta.output_chars === "number" && (
+            <DetailRow label="Bytes" value={String(meta.output_chars)} />
+          )}
+          {typeof meta.output_preview === "string" && (
+            <DetailBlock label="Response" text={meta.output_preview} />
+          )}
+        </>
+      )}
+
+      {service === "email" && (
+        <>
+          {meta.to != null && (
+            <DetailRow label="To" value={String(meta.to)} mono />
+          )}
+          {typeof meta.subject_preview === "string" && (
+            <DetailRow label="Subject" value={meta.subject_preview} />
+          )}
+          {typeof meta.output_preview === "string" && (
+            <DetailBlock label="Body" text={meta.output_preview} />
+          )}
+        </>
+      )}
+
+      {(service === "output" || service === "file_read") && (
+        <>
+          {typeof meta.output_preview === "string" && (
+            <DetailBlock label="Output" text={meta.output_preview} />
+          )}
+          {typeof meta.template_preview === "string" &&
+            !meta.output_preview && (
+              <DetailBlock label="Template" text={meta.template_preview} />
+            )}
+        </>
+      )}
+
+      {group.state === "fail" && typeof meta.error === "string" && (
+        <DetailBlock label="Error" text={meta.error} tone="error" />
+      )}
+
+      {group.completeEvent?.event_ref && (
+        <a
+          href={`https://obs.hirecody.dev/events/${group.completeEvent.event_ref}`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-block text-xs font-semibold text-[color:var(--color-primary)] hover:underline"
+        >
+          View on Obs →
+        </a>
+      )}
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  mono,
+  wrap,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  wrap?: boolean;
+}) {
+  return (
+    <div className="text-xs">
+      <div className="font-semibold text-[color:var(--color-muted-foreground)]">
+        {label}
+      </div>
+      <div
+        className={`${mono ? "font-mono" : ""} ${wrap ? "break-all" : "truncate"}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function DetailBlock({
+  label,
+  text,
+  tone,
+}: {
+  label: string;
+  text: string;
+  tone?: "error";
+}) {
+  return (
+    <div>
+      <div className="text-xs font-semibold text-[color:var(--color-muted-foreground)]">
+        {label}
+      </div>
+      <pre
+        className={`mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded p-2 font-mono text-[11px] ${
+          tone === "error"
+            ? "bg-[#F4D6D2] text-[#7A1F1A]"
+            : "bg-[color:var(--color-card)]"
+        }`}
+      >
+        {text}
+      </pre>
     </div>
   );
 }

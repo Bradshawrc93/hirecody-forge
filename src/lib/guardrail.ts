@@ -1,15 +1,17 @@
 import { haikuJSON } from "./anthropic";
 
-const GUARDRAIL_PROMPT = `You are evaluating whether a user's agent description is feasible for a lightweight automation platform. The platform supports: single-purpose agents with 1-5 steps, LLM calls (text generation, summarization, classification, extraction), web fetching (GET requests to public URLs), file processing (.csv and .md files — reading, transforming, generating), email sending (to a single verified address), and scheduled execution (daily/weekly/monthly).
+const GUARDRAIL_PROMPT = `You are helping classify a user's agent description for a lightweight automation platform. The platform supports: LLM calls (text generation, summarization, classification, extraction, research with web search), web fetching (public URLs, news, articles, RSS), file processing (.csv and .md — reading, transforming, generating), email sending (to a single verified address), and scheduled execution (daily/weekly/monthly).
 
-The platform does NOT support: multi-system orchestration requiring authentication to external services (other than the provided email), database connections, long-running processes (over 2 minutes), agents that need to maintain state across runs, real-time monitoring or streaming data, image/video/audio processing, or interactions with desktop applications.
+Be generous. Default to "simple" or "moderate". Things like "daily news digest", "weekly summary of X", "monitor a page and email me changes", or "generate content on a schedule" are all well within scope — they do not require external API keys, state, or long-running processes. Only mark something "complex" if it genuinely cannot work: requires authenticating to a third-party service the user would need to provide credentials for, requires image/video/audio processing, requires sub-minute real-time streaming, or requires interacting with desktop apps.
 
-Evaluate the description and respond with ONLY a JSON object:
+Even when you mark something "complex", the user will still be allowed to proceed — your job is informational, not gatekeeping. The "reason" should be a friendly, encouraging nudge (not a rejection), suggesting how they might narrow scope if they run into trouble.
+
+Respond with ONLY a JSON object:
 {
   "feasibility": "simple" | "moderate" | "complex",
   "needs_llm": "unlikely" | "maybe" | "likely",
   "suggested_input": "none" | "text" | "file" | "both",
-  "reason": "one sentence explanation if complex"
+  "reason": "one short friendly sentence if complex"
 }`;
 
 const SAFETY_PROMPT = `You are a content moderation classifier for a public agent playground. Your job is to flag agent display names and descriptions that contain profanity, hate speech, sexual content, or harassment. Be lenient with weird/creative ideas — only flag actual abuse.

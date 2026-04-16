@@ -28,7 +28,7 @@ export const DEFAULT_FORM: FormState = {
   model: "claude-sonnet-4-6",
   input_type: "none",
   can_send_email: false,
-  has_web_access: false,
+  has_web_access: true,
   schedule_cadence: null,
   schedule_time: null,
   schedule_day_of_week: null,
@@ -40,9 +40,10 @@ export const DEFAULT_FORM: FormState = {
 };
 
 export const RUNTIME_MODELS = [
+  { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
   { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
   { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
-  { id: "gpt-5.4", label: "GPT-5.4" },
-  { id: "gpt-5.4-mini", label: "GPT-5.4-mini" },
-  { id: "gpt-5.4-nano", label: "GPT-5.4-nano" },
+  { id: "gpt-4o", label: "GPT-4o" },
+  { id: "gpt-4o-mini", label: "GPT-4o mini" },
+  { id: "gpt-4-turbo", label: "GPT-4 Turbo" },
 ];

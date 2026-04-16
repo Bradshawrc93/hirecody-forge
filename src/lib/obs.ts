@@ -363,6 +363,17 @@ export function emailVerify(
   });
 }
 
+export function emailSendResult(
+  apiKey: string,
+  input: { subject: string; body: string; format?: "text" | "html" }
+): Promise<{ ok: true; message_id: string }> {
+  return request("/api/forge/email/send-result", {
+    method: "POST",
+    body: JSON.stringify(input),
+    apiKey,
+  });
+}
+
 // ───────────────────────── Feedback ─────────────────────────
 
 export function postFeedback(input: {

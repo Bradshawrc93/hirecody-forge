@@ -36,22 +36,6 @@ export function Step3Success({ form, setForm, onNext, onBack }: Props) {
       </div>
 
       <div>
-        <label className="label">What should the agent output?</label>
-        <select
-          className="input"
-          value={form.output_type}
-          onChange={(e) =>
-            setForm({ ...form, output_type: e.target.value as FormState["output_type"] })
-          }
-        >
-          <option value="text">Text response</option>
-          <option value="file">A file</option>
-          <option value="email">An email to me</option>
-          <option value="side-effect">Nothing visible — it performs an action</option>
-        </select>
-      </div>
-
-      <div>
         <label className="label">Anything else the agent should know?</label>
         <textarea
           className="input min-h-[100px]"

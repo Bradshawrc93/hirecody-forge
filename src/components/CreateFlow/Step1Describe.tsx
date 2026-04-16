@@ -50,11 +50,10 @@ export function Step1Describe({ form, setForm, onNext }: Props) {
     };
   }, [form.description]);
 
-  const blocked = guardrail?.feasibility === "complex";
+  const showHeadsUp = guardrail?.feasibility === "complex";
   const canContinue =
     form.display_name.trim().length > 0 &&
     form.description.trim().length >= 10 &&
-    !blocked &&
     !checking;
 
   return (
@@ -100,15 +99,33 @@ export function Step1Describe({ form, setForm, onNext }: Props) {
         />
         <div className="mt-1 flex items-center justify-between text-xs text-[color:var(--color-muted-foreground)]">
           <span>{form.description.length}/500</span>
-          {checking && <span>Checking feasibility…</span>}
+          {checking ? (
+            <span>Checking feasibility…</span>
+          ) : guardrail ? (
+            <span
+              className={
+                guardrail.feasibility === "simple"
+                  ? "font-semibold text-[#4F8A4F]"
+                  : guardrail.feasibility === "moderate"
+                  ? "font-semibold text-[#C56A2D]"
+                  : "font-semibold text-[#B3413A]"
+              }
+            >
+              {guardrail.feasibility === "simple"
+                ? "Low complexity"
+                : guardrail.feasibility === "moderate"
+                ? "Medium complexity"
+                : "High complexity"}
+            </span>
+          ) : null}
         </div>
       </div>
 
-      {blocked && (
-        <div className="rounded-md border border-[#E5BFB5] bg-[#F4D6D2] px-3 py-2 text-sm text-[#7A1F1A]">
-          This sounds like a pretty ambitious automation — Forge works best
-          with focused, single-purpose agents. Could you simplify the scope a
-          bit?{" "}
+      {showHeadsUp && (
+        <div className="rounded-md border border-[#E5D5B5] bg-[#F7ECD2] px-3 py-2 text-sm text-[#6B4E1A]">
+          Heads up — this one is on the ambitious side for Forge. You can still
+          give it a try, and you might just need to narrow the scope a bit as
+          you go.{" "}
           {guardrail?.reason && <span className="italic">{guardrail.reason}</span>}
         </div>
       )}
