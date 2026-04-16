@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BackButton } from "@/components/BackButton";
 import { AgentActions } from "@/components/AgentActions";
 import { StatusBadge, RunStatusBadge } from "@/components/StatusBadge";
 import { findAgentBySlug } from "@/lib/agent-lookup";
 import { getAgent, listAgentRuns } from "@/lib/obs";
 import { getAgentKey } from "@/lib/kv";
 import { formatDuration, relativeTime, formatCost, formatScheduleTimeCT } from "@/lib/format";
+import { legacyInputTypeToConfig } from "@/components/CreateFlow/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -26,7 +26,6 @@ export default async function AgentDetailPage({
     // seeded directly). Render a read-only view.
     return (
       <main className="relative min-h-screen">
-        <BackButton />
         <div className="mx-auto max-w-4xl px-6 pt-16">
           <h1 className="text-2xl font-bold">{lean.apps?.display_name}</h1>
           <p className="mt-2 text-sm">{lean.description}</p>
@@ -47,8 +46,6 @@ export default async function AgentDetailPage({
 
   return (
     <main className="relative min-h-screen">
-      <BackButton />
-
       <div className="mx-auto max-w-5xl px-6 pt-16 pb-16">
         <Link
           href="/"
@@ -80,12 +77,14 @@ export default async function AgentDetailPage({
             <AgentActions
               appId={app.id}
               slug={app.slug}
+              agentName={app.display_name}
               status={agent.status}
+              inputConfig={legacyInputTypeToConfig(agent.input_type ?? "none")}
               formSnapshot={{
                 display_name: app.display_name,
                 description: agent.description,
                 model: agent.model,
-                input_type: agent.input_type,
+                input_config: legacyInputTypeToConfig(agent.input_type ?? "none"),
                 output_type: agent.output_type,
                 success_criteria: agent.success_criteria,
                 context_text: agent.context_text,
@@ -161,7 +160,17 @@ export default async function AgentDetailPage({
 
           <aside className="card h-fit space-y-2 p-4 text-xs">
             <Row label="Model" value={agent.model ?? "—"} />
-            <Row label="Input" value={agent.input_type ?? "none"} />
+            <Row label="Input" value={
+              (() => {
+                const ic = legacyInputTypeToConfig(agent.input_type ?? "none");
+                const parts = [
+                  ic.text.enabled && "text",
+                  ic.url.enabled && "url",
+                  ic.file.enabled && "file",
+                ].filter(Boolean);
+                return parts.length ? parts.join(", ") : "none";
+              })()
+            } />
             <Row label="Email" value={agent.can_send_email ? "yes" : "no"} />
             <Row label="Created" value={relativeTime(agent.created_at)} />
             <Row label="Expires" value={relativeTime(agent.expires_at)} />

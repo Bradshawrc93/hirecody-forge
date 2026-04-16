@@ -1,6 +1,7 @@
 import { anthropic, BUILDER_MODEL } from "./anthropic";
 import type { AgentPlan } from "./agent-plan";
 import { isAgentPlan } from "./agent-plan";
+import type { InputConfig } from "@/components/CreateFlow/types";
 
 export interface BuilderInput {
   display_name: string;
@@ -9,7 +10,7 @@ export interface BuilderInput {
   context_text?: string | null;
   needs_llm: boolean;
   model: string;
-  input_type: "none" | "text" | "file" | "both";
+  input_config: InputConfig;
   can_send_email: boolean;
   has_web_access: boolean;
   output_type: "text" | "file" | "email" | "notification" | "side-effect";
@@ -23,11 +24,11 @@ const SYSTEM = `You are an agent designer for a lightweight automation platform.
 The plan must use ONLY these step types:
 - "llm": calls an LLM. Fields: name, prompt, optional output_var, optional max_tokens (default 1024).
 - "web_fetch": HTTP GET to a public URL. Fields: name, url, optional output_var. Only allowed when has_web_access is true.
-- "file_read": reads the user-provided input file. Fields: name, optional output_var. Only allowed when input_type is "file" or "both".
+- "file_read": reads the user-provided input file. Fields: name, optional output_var. Only allowed when input_config.file.enabled is true.
 - "email": sends an email to the verified address. Fields: name, subject_template, body_template. Only allowed when can_send_email is true. The subject_template MUST be a short one-line string (under ~80 chars) — typically a literal title, optionally with {{input_text}} or a short variable. NEVER reference the long body/output variable in subject_template: email providers reject subjects containing newlines.
 - "output": final markdown rendered for the user. Fields: name, template. Required.
 
-Templates may reference prior step outputs via {{output_var}}, the user input as {{input_text}}, and the file contents as {{file_text}}.
+Templates may reference prior step outputs via {{output_var}}, the user's text input as {{input_text}}, the user's URL input as {{input_url}}, and the file contents as {{file_text}}.
 
 Constraints:
 - 1 to 5 steps total.
@@ -56,7 +57,7 @@ export async function buildAgentPlan(input: BuilderInput): Promise<{
     context_text: input.context_text ?? null,
     needs_llm: input.needs_llm,
     runtime_model: input.model,
-    input_type: input.input_type,
+    input_config: input.input_config,
     can_send_email: input.can_send_email,
     has_web_access: input.has_web_access,
     output_type: input.output_type,

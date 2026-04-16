@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
-import { BackButton } from "@/components/BackButton";
 import { LiveRunView } from "@/components/LiveRunView";
 import { MarkdownView } from "@/components/MarkdownView";
 import { Waterfall } from "@/components/Waterfall";
@@ -39,7 +38,6 @@ export default async function RunDetailPage({
 
   return (
     <main className="relative min-h-screen">
-      <BackButton />
       <div className="mx-auto max-w-4xl px-6 pt-16 pb-16">
         <Link
           href={`/agents/${slug}`}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Obs Forge",
+  title: "Forge",
   description:
     "A playground for building and running custom agents. Build one, watch it work, see the telemetry.",
 };

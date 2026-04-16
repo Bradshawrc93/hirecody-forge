@@ -6,6 +6,26 @@ import { Waterfall } from "@/components/Waterfall";
 import { MarkdownView } from "@/components/MarkdownView";
 import type { FormState } from "./types";
 
+const ACCEPTED_EXTENSIONS = ".txt,.docx,.csv,.md";
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    if (file.name.endsWith(".docx")) {
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(",")[1] ?? "";
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    } else {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsText(file);
+    }
+  });
+}
+
 interface Props {
   appId: string;
   slug: string;
@@ -27,6 +47,8 @@ export function Step5Test({
 }: Props) {
   const [runId, setRunId] = useState<string | null>(null);
   const [inputText, setInputText] = useState("");
+  const [inputUrl, setInputUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [terminal, setTerminal] = useState<"completed" | "failed" | null>(null);
   const [output, setOutput] = useState<string | null>(null);
   const [thumbsDown, setThumbsDown] = useState(false);
@@ -34,18 +56,30 @@ export function Step5Test({
   const [showTooComplex, setShowTooComplex] = useState(false);
   const startedRef = useRef(false);
 
-  const needsInput = form.input_type === "text" || form.input_type === "both";
+  const ic = form.input_config;
+  const hasAnyInput = ic.text.enabled || ic.url.enabled || ic.file.enabled;
 
   async function startRun() {
     if (startedRef.current) return;
     startedRef.current = true;
+
+    let fileText: string | null = null;
+    let fileName: string | null = null;
+    if (file) {
+      fileText = await readFileAsText(file);
+      fileName = file.name;
+    }
+
     const res = await fetch("/api/internal/run", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         app_id: appId,
         run_type: "test",
-        input_text: needsInput ? inputText : null,
+        input_text: ic.text.enabled ? inputText || null : null,
+        input_url: ic.url.enabled ? inputUrl || null : null,
+        file_text: fileText,
+        file_name: fileName,
       }),
     });
     const body = await res.json();
@@ -140,15 +174,65 @@ export function Step5Test({
             /agents/{slug}
           </p>
         </div>
-        {needsInput && (
+        {ic.text.enabled && (
           <div>
-            <label className="label">Test input</label>
-            <textarea
-              className="input min-h-[80px]"
-              placeholder="Provide a test input for this run…"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+            <label className="label">{ic.text.label || "Text input"}</label>
+            {ic.text.size === "long" ? (
+              <textarea
+                className="input min-h-[100px]"
+                placeholder="Provide a test input for this run…"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+              />
+            ) : (
+              <input
+                className="input"
+                placeholder="Provide a test input for this run…"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+              />
+            )}
+          </div>
+        )}
+        {ic.url.enabled && (
+          <div>
+            <label className="label">{ic.url.label || "URL"}</label>
+            <input
+              className="input"
+              type="url"
+              placeholder="https://"
+              value={inputUrl}
+              onChange={(e) => setInputUrl(e.target.value)}
             />
+          </div>
+        )}
+        {ic.file.enabled && (
+          <div>
+            <label className="label">{ic.file.label || "Upload a file"}</label>
+            <input
+              type="file"
+              accept={ACCEPTED_EXTENSIONS}
+              className="input"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
+                if (![".txt", ".docx", ".csv", ".md"].includes(ext)) {
+                  alert("Unsupported file type. Supported: .txt, .docx, .csv, .md");
+                  e.target.value = "";
+                  return;
+                }
+                setFile(f);
+              }}
+            />
+            {file && (
+              <p className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
+                {file.name} — {(file.size / 1024).toFixed(1)} KB
+              </p>
+            )}
+            <p className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
+              Supported: .txt, .docx, .csv, .md
+            </p>
           </div>
         )}
         <div className="flex justify-end">

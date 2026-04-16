@@ -13,6 +13,7 @@
     "@anthropic-ai/sdk": "^0.32.1",
     "@upstash/redis": "^1.37.0",
     "lucide-react": "^0.454.0",
+    "mammoth": "^1.12.0",
     "marked": "^18.0.0",
     "next": "^15.5.0",
     "openai": "^4.73.0",

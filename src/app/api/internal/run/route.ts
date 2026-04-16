@@ -3,12 +3,15 @@ import { createRun, getAgent, ObsError, type RunType } from "@/lib/obs";
 import { getAgentKey } from "@/lib/kv";
 import { executeAgent } from "@/lib/execution-engine";
 import { isAgentPlan } from "@/lib/agent-plan";
+import { parseDocx } from "@/lib/docx-parse";
 
 interface Body {
   app_id: string;
   run_type: RunType;
   input_text?: string | null;
+  input_url?: string | null;
   file_text?: string | null;
+  file_name?: string | null;
 }
 
 export const maxDuration = 60;
@@ -54,15 +57,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "create_run_failed" }, { status: 502 });
   }
 
-  // Kick execution off async. We return the run_id immediately so the
-  // client can begin polling the waterfall. The execution finishes inside
-  // this same serverless invocation.
+  let fileText = body.file_text ?? null;
+  if (fileText && body.file_name?.endsWith(".docx")) {
+    try {
+      fileText = await parseDocx(Buffer.from(fileText, "base64"));
+    } catch {
+      return NextResponse.json({ error: "docx_parse_failed" }, { status: 400 });
+    }
+  }
+
   executeAgent({
     runId: run.id,
     apiKey,
     plan,
     inputText: body.input_text,
-    fileText: body.file_text,
+    inputUrl: body.input_url,
+    fileText,
     verifiedEmail: agentInfo.agent.verified_email,
   }).catch((err) => console.error("execution error", err));
 

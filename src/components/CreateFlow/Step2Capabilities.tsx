@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormState } from "./types";
+import type { FormState, InputConfig } from "./types";
 import { RUNTIME_MODELS } from "./types";
 import { EmailVerify } from "./EmailVerify";
 
@@ -91,24 +91,138 @@ export function Step2Capabilities({ form, setForm, onNext, onBack }: Props) {
         </p>
       </div>
 
-      <div>
-        <label className="label">What input will this agent depend on?</label>
-        <select
-          className="input"
-          value={form.input_type}
-          onChange={(e) =>
-            setForm({ ...form, input_type: e.target.value as FormState["input_type"] })
-          }
-        >
-          <option value="none">Nothing — it runs on its own</option>
-          <option value="text">Text input (a prompt, a URL, a name, etc.)</option>
-          <option value="file">A file upload (.csv or .md only)</option>
-          <option value="both">Both text and a file</option>
-        </select>
-        <p className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
-          Pick &quot;Nothing&quot; for scheduled agents that gather their own
-          data (e.g., news digests, monitors).
+      <div className="space-y-3">
+        <label className="label">What input will this agent need?</label>
+        <div className="flex flex-wrap gap-4">
+          {(["text", "url", "file"] as const).map((key) => {
+            const labels = { text: "Text input", url: "URL", file: "File upload" } as const;
+            const checked = form.input_config[key].enabled;
+            return (
+              <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    const updated: InputConfig = {
+                      ...form.input_config,
+                      [key]: { ...form.input_config[key], enabled: !checked },
+                    };
+                    setForm({ ...form, input_config: updated });
+                  }}
+                />
+                {labels[key]}
+              </label>
+            );
+          })}
+        </div>
+        <p className="text-xs text-[color:var(--color-muted-foreground)]">
+          Check all that apply. Leave all unchecked for agents that gather their
+          own data (e.g., scheduled digests).
         </p>
+
+        {form.input_config.text.enabled && (
+          <div className="space-y-2 rounded-md border border-[color:var(--color-border)] p-3">
+            <div>
+              <span className="text-xs font-medium">Expected length</span>
+              <div className="mt-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn-toggle"
+                  data-active={form.input_config.text.size === "short"}
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      input_config: {
+                        ...form.input_config,
+                        text: { ...form.input_config.text, size: "short" },
+                      },
+                    })
+                  }
+                >
+                  Short
+                </button>
+                <button
+                  type="button"
+                  className="btn-toggle"
+                  data-active={form.input_config.text.size === "long"}
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      input_config: {
+                        ...form.input_config,
+                        text: { ...form.input_config.text, size: "long" },
+                      },
+                    })
+                  }
+                >
+                  Long
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium">Label (optional)</label>
+              <input
+                className="input mt-1"
+                placeholder="e.g., Paste your meeting transcript here"
+                value={form.input_config.text.label ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    input_config: {
+                      ...form.input_config,
+                      text: { ...form.input_config.text, label: e.target.value || undefined },
+                    },
+                  })
+                }
+              />
+            </div>
+          </div>
+        )}
+
+        {form.input_config.url.enabled && (
+          <div className="rounded-md border border-[color:var(--color-border)] p-3">
+            <label className="text-xs font-medium">Label (optional)</label>
+            <input
+              className="input mt-1"
+              placeholder="e.g., Enter the webpage URL to analyze"
+              value={form.input_config.url.label ?? ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  input_config: {
+                    ...form.input_config,
+                    url: { ...form.input_config.url, label: e.target.value || undefined },
+                  },
+                })
+              }
+            />
+          </div>
+        )}
+
+        {form.input_config.file.enabled && (
+          <div className="space-y-2 rounded-md border border-[color:var(--color-border)] p-3">
+            <div>
+              <label className="text-xs font-medium">Label (optional)</label>
+              <input
+                className="input mt-1"
+                placeholder="e.g., Upload your meeting recording transcript"
+                value={form.input_config.file.label ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    input_config: {
+                      ...form.input_config,
+                      file: { ...form.input_config.file, label: e.target.value || undefined },
+                    },
+                  })
+                }
+              />
+            </div>
+            <p className="text-xs text-[color:var(--color-muted-foreground)]">
+              Supported formats: .txt, .docx, .csv, .md
+            </p>
+          </div>
+        )}
       </div>
 
       <div>

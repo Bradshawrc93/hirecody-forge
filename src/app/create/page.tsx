@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BackButton } from "@/components/BackButton";
 import { StepIndicator } from "@/components/CreateFlow/StepIndicator";
 import { Step1Describe } from "@/components/CreateFlow/Step1Describe";
 import { Step2Capabilities } from "@/components/CreateFlow/Step2Capabilities";
@@ -89,8 +88,6 @@ export default function CreatePage() {
 
   return (
     <main className="relative min-h-screen">
-      <BackButton />
-
       <div className="mx-auto max-w-2xl px-4 pt-16 pb-12">
         <div className="card relative p-6 md:p-8">
           <div className="mb-6 space-y-4">

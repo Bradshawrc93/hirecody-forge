@@ -12,6 +12,8 @@ import { buildAgentPlan } from "@/lib/builder";
 import { safetyCheck } from "@/lib/guardrail";
 import { BUILDER_MODEL } from "@/lib/anthropic";
 import { slugify } from "@/lib/format";
+import type { InputConfig } from "@/components/CreateFlow/types";
+import { inputConfigToLegacy } from "@/components/CreateFlow/types";
 
 interface RequestBody {
   // Step 1
@@ -21,7 +23,7 @@ interface RequestBody {
   // Step 2
   needs_llm: boolean;
   model: string;
-  input_type: "none" | "text" | "file" | "both";
+  input_config: InputConfig;
   can_send_email: boolean;
   has_web_access: boolean;
   schedule_cadence: "daily" | "weekly" | "monthly" | null;
@@ -69,7 +71,7 @@ export async function POST(req: Request) {
     config: {},
     needs_llm: body.needs_llm,
     model: body.model,
-    input_type: body.input_type,
+    input_type: inputConfigToLegacy(body.input_config),
     can_send_email: body.can_send_email,
     has_web_access: body.has_web_access,
     success_criteria: body.success_criteria,
@@ -138,7 +140,7 @@ export async function POST(req: Request) {
       context_text: body.context_text,
       needs_llm: body.needs_llm,
       model: body.model,
-      input_type: body.input_type,
+      input_config: body.input_config,
       can_send_email: body.can_send_email,
       has_web_access: body.has_web_access,
       output_type: body.output_type,

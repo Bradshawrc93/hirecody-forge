@@ -28,6 +28,7 @@ interface ExecutionInput {
   apiKey: string;
   plan: AgentPlan;
   inputText?: string | null;
+  inputUrl?: string | null;
   fileText?: string | null;
   verifiedEmail?: string | null;
 }
@@ -135,7 +136,7 @@ async function runWebFetchStep(
 export async function executeAgent(
   input: ExecutionInput
 ): Promise<ExecutionResult> {
-  const { runId, apiKey, plan, inputText, fileText, verifiedEmail } = input;
+  const { runId, apiKey, plan, inputText, inputUrl, fileText, verifiedEmail } = input;
   const runStart = Date.now();
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
@@ -150,6 +151,7 @@ export async function executeAgent(
 
   const vars: Record<string, string> = {
     input_text: inputText ?? "",
+    input_url: inputUrl ?? "",
     file_text: fileText ?? "",
   };
 

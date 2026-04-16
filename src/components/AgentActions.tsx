@@ -4,21 +4,38 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pause, Play, Play as PlayIcon, Trash2, Copy } from "lucide-react";
 import type { AgentRecord } from "@/lib/obs";
+import type { InputConfig } from "@/components/CreateFlow/types";
+import { DEFAULT_INPUT_CONFIG } from "@/components/CreateFlow/types";
+import { RunDialog } from "./RunDialog";
 
 interface Props {
   appId: string;
   slug: string;
+  agentName: string;
   status: AgentRecord["status"];
+  inputConfig?: InputConfig;
   formSnapshot?: Record<string, unknown>;
 }
 
-export function AgentActions({ appId, slug, status, formSnapshot }: Props) {
+export function AgentActions({ appId, slug, agentName, status, inputConfig, formSnapshot }: Props) {
   const router = useRouter();
   const [optimisticStatus, setOptimisticStatus] = useState(status);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showRunDialog, setShowRunDialog] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  async function runNow() {
+  const resolvedConfig = inputConfig ?? DEFAULT_INPUT_CONFIG;
+  const hasAnyInput = resolvedConfig.text.enabled || resolvedConfig.url.enabled || resolvedConfig.file.enabled;
+
+  function runNow() {
+    if (hasAnyInput) {
+      setShowRunDialog(true);
+    } else {
+      fireRun();
+    }
+  }
+
+  async function fireRun() {
     setBusy(true);
     try {
       const res = await fetch("/api/internal/run", {
@@ -110,6 +127,16 @@ export function AgentActions({ appId, slug, status, formSnapshot }: Props) {
       >
         <Trash2 size={14} className="mr-1 inline" /> Delete
       </button>
+
+      {showRunDialog && (
+        <RunDialog
+          appId={appId}
+          slug={slug}
+          agentName={agentName}
+          inputConfig={resolvedConfig}
+          onClose={() => setShowRunDialog(false)}
+        />
+      )}
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

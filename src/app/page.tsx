@@ -24,21 +24,13 @@ export default async function HomePage() {
 
   return (
     <main className="relative min-h-screen">
-      <BackButton />
-
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 pt-16">
-        <div className="font-mono text-sm tracking-tight">obs / forge</div>
-        <a
-          href="https://obs.hirecody.dev"
-          className="text-sm font-semibold text-[color:var(--color-primary)] hover:underline"
-        >
-          View telemetry on Obs →
-        </a>
+      <header className="mx-auto max-w-6xl px-6 pt-6">
+        <BackButton />
       </header>
 
       <section className="mx-auto max-w-6xl px-6 pt-12">
         <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-          Obs Forge
+          Forge
         </h1>
         <p className="mt-3 max-w-2xl text-base text-[color:var(--color-muted-foreground)] md:text-lg">
           A playground for building and running custom agents. Build one, watch

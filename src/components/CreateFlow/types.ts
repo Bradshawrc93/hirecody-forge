@@ -1,3 +1,48 @@
+export interface InputTypeConfig {
+  enabled: boolean;
+  label?: string;
+}
+
+export interface TextInputConfig extends InputTypeConfig {
+  size: "short" | "long";
+}
+
+export interface InputConfig {
+  text: TextInputConfig;
+  url: InputTypeConfig;
+  file: InputTypeConfig;
+}
+
+export const DEFAULT_INPUT_CONFIG: InputConfig = {
+  text: { enabled: false, size: "short" },
+  url: { enabled: false },
+  file: { enabled: false },
+};
+
+export type LegacyInputType = "none" | "text" | "file" | "both";
+
+export function legacyInputTypeToConfig(input_type: LegacyInputType): InputConfig {
+  switch (input_type) {
+    case "text":
+      return { text: { enabled: true, size: "short" }, url: { enabled: false }, file: { enabled: false } };
+    case "file":
+      return { text: { enabled: false, size: "short" }, url: { enabled: false }, file: { enabled: true } };
+    case "both":
+      return { text: { enabled: true, size: "short" }, url: { enabled: false }, file: { enabled: true } };
+    default:
+      return { ...DEFAULT_INPUT_CONFIG };
+  }
+}
+
+export function inputConfigToLegacy(config: InputConfig): LegacyInputType {
+  const t = config.text.enabled;
+  const f = config.file.enabled;
+  if (t && f) return "both";
+  if (t) return "text";
+  if (f) return "file";
+  return "none";
+}
+
 export interface FormState {
   // Step 1
   display_name: string;
@@ -6,7 +51,7 @@ export interface FormState {
   // Step 2
   needs_llm: boolean;
   model: string;
-  input_type: "none" | "text" | "file" | "both";
+  input_config: InputConfig;
   can_send_email: boolean;
   has_web_access: boolean;
   schedule_cadence: "daily" | "weekly" | "monthly" | null;
@@ -26,7 +71,7 @@ export const DEFAULT_FORM: FormState = {
   description: "",
   needs_llm: true,
   model: "claude-sonnet-4-6",
-  input_type: "none",
+  input_config: { ...DEFAULT_INPUT_CONFIG },
   can_send_email: false,
   has_web_access: true,
   schedule_cadence: null,

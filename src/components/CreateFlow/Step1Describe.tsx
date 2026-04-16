@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { slugify } from "@/lib/format";
 import type { FormState } from "./types";
+import { legacyInputTypeToConfig } from "./types";
 
 interface Props {
   form: FormState;
@@ -141,7 +142,7 @@ export function Step1Describe({ form, setForm, onNext }: Props) {
               setForm({
                 ...form,
                 needs_llm: guardrail.needs_llm !== "unlikely",
-                input_type: guardrail.suggested_input,
+                input_config: legacyInputTypeToConfig(guardrail.suggested_input),
               });
             }
             onNext();

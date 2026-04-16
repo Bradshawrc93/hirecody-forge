@@ -4,6 +4,7 @@ import { getAgentKey } from "@/lib/kv";
 import { buildAgentPlan } from "@/lib/builder";
 import { BUILDER_MODEL } from "@/lib/anthropic";
 import { isAgentPlan, type AgentPlan } from "@/lib/agent-plan";
+import { legacyInputTypeToConfig } from "@/components/CreateFlow/types";
 
 interface RequestBody {
   app_id: string;
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
       context_text: agent.context_text ?? null,
       needs_llm: agent.needs_llm ?? true,
       model: agent.model ?? "claude-sonnet-4-6",
-      input_type: agent.input_type ?? "none",
+      input_config: legacyInputTypeToConfig(agent.input_type ?? "none"),
       can_send_email: agent.can_send_email ?? false,
       has_web_access: agent.has_web_access ?? false,
       output_type: agent.output_type ?? "text",
