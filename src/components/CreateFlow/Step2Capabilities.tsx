@@ -1,7 +1,7 @@
 "use client";
 
-import type { FormState, InputConfig } from "./types";
-import { RUNTIME_MODELS } from "./types";
+import type { FormState, InputConfig, FileSlot } from "./types";
+import { RUNTIME_MODELS, MAX_FILE_SLOTS } from "./types";
 import { EmailVerify } from "./EmailVerify";
 
 interface Props {
@@ -103,10 +103,27 @@ export function Step2Capabilities({ form, setForm, onNext, onBack }: Props) {
                   type="checkbox"
                   checked={checked}
                   onChange={() => {
-                    const updated: InputConfig = {
-                      ...form.input_config,
-                      [key]: { ...form.input_config[key], enabled: !checked },
-                    };
+                    const nextEnabled = !checked;
+                    let updated: InputConfig;
+                    if (key === "file") {
+                      updated = {
+                        ...form.input_config,
+                        file: nextEnabled
+                          ? {
+                              enabled: true,
+                              slots:
+                                form.input_config.file.slots.length > 0
+                                  ? form.input_config.file.slots
+                                  : [{ label: "", required: true }],
+                            }
+                          : { enabled: false, slots: form.input_config.file.slots },
+                      };
+                    } else {
+                      updated = {
+                        ...form.input_config,
+                        [key]: { ...form.input_config[key], enabled: nextEnabled },
+                      };
+                    }
                     setForm({ ...form, input_config: updated });
                   }}
                 />
@@ -200,24 +217,123 @@ export function Step2Capabilities({ form, setForm, onNext, onBack }: Props) {
         )}
 
         {form.input_config.file.enabled && (
-          <div className="space-y-2 rounded-md border border-[color:var(--color-border)] p-3">
-            <div>
-              <label className="text-xs font-medium">Label (optional)</label>
-              <input
-                className="input mt-1"
-                placeholder="e.g., Upload your meeting recording transcript"
-                value={form.input_config.file.label ?? ""}
-                onChange={(e) =>
+          <div className="space-y-3 rounded-md border border-[color:var(--color-border)] p-3">
+            {form.input_config.file.slots.map((slot, idx) => (
+              <div
+                key={idx}
+                className="space-y-2 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-card)] p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">File {idx + 1}</span>
+                  {form.input_config.file.slots.length > 1 && (
+                    <button
+                      type="button"
+                      aria-label={`Remove file ${idx + 1}`}
+                      className="text-[color:var(--color-muted-foreground)] hover:text-[#B3413A]"
+                      onClick={() => {
+                        const slots = form.input_config.file.slots.filter(
+                          (_, i) => i !== idx
+                        );
+                        setForm({
+                          ...form,
+                          input_config: {
+                            ...form.input_config,
+                            file: { ...form.input_config.file, slots },
+                          },
+                        });
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-medium">Label</label>
+                  <input
+                    className="input mt-1"
+                    placeholder={
+                      idx === 0
+                        ? "e.g., This Week's Jira Export"
+                        : "e.g., Last Week's Jira Export"
+                    }
+                    value={slot.label}
+                    onChange={(e) => {
+                      const slots: FileSlot[] = form.input_config.file.slots.map(
+                        (s, i) => (i === idx ? { ...s, label: e.target.value } : s)
+                      );
+                      setForm({
+                        ...form,
+                        input_config: {
+                          ...form.input_config,
+                          file: { ...form.input_config.file, slots },
+                        },
+                      });
+                    }}
+                  />
+                </div>
+                <div className="flex items-center gap-4 text-xs">
+                  <label className="flex cursor-pointer items-center gap-1">
+                    <input
+                      type="radio"
+                      checked={slot.required}
+                      onChange={() => {
+                        const slots = form.input_config.file.slots.map((s, i) =>
+                          i === idx ? { ...s, required: true } : s
+                        );
+                        setForm({
+                          ...form,
+                          input_config: {
+                            ...form.input_config,
+                            file: { ...form.input_config.file, slots },
+                          },
+                        });
+                      }}
+                    />
+                    Required
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-1">
+                    <input
+                      type="radio"
+                      checked={!slot.required}
+                      onChange={() => {
+                        const slots = form.input_config.file.slots.map((s, i) =>
+                          i === idx ? { ...s, required: false } : s
+                        );
+                        setForm({
+                          ...form,
+                          input_config: {
+                            ...form.input_config,
+                            file: { ...form.input_config.file, slots },
+                          },
+                        });
+                      }}
+                    />
+                    Optional
+                  </label>
+                </div>
+              </div>
+            ))}
+            {form.input_config.file.slots.length < MAX_FILE_SLOTS && (
+              <button
+                type="button"
+                className="text-xs font-semibold text-[color:var(--color-primary)] hover:underline"
+                onClick={() => {
+                  const slots: FileSlot[] = [
+                    ...form.input_config.file.slots,
+                    { label: "", required: true },
+                  ];
                   setForm({
                     ...form,
                     input_config: {
                       ...form.input_config,
-                      file: { ...form.input_config.file, label: e.target.value || undefined },
+                      file: { ...form.input_config.file, slots },
                     },
-                  })
-                }
-              />
-            </div>
+                  });
+                }}
+              >
+                + Add file slot ({MAX_FILE_SLOTS - form.input_config.file.slots.length} of {MAX_FILE_SLOTS} remaining)
+              </button>
+            )}
             <p className="text-xs text-[color:var(--color-muted-foreground)]">
               Supported formats: .txt, .docx, .csv, .md
             </p>

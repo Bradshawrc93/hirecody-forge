@@ -17,7 +17,14 @@ export type AgentStatus =
 export type RunStatus = "queued" | "running" | "completed" | "failed";
 export type RunType = "test" | "scheduled" | "manual";
 export type InputType = "none" | "text" | "file" | "both";
-export type OutputType = "text" | "file" | "email" | "notification" | "side-effect";
+export type OutputType =
+  | "text"
+  | "file"
+  | "email"
+  | "notification"
+  | "html_report"
+  | "csv"
+  | "side-effect";
 export type CreatorType = "owner" | "visitor";
 export type Cadence = "daily" | "weekly" | "monthly";
 

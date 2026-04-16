@@ -1,16 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MarkdownView } from "./MarkdownView";
 import { Waterfall } from "./Waterfall";
+import { CsvDownloadBlock } from "./CsvDownloadBlock";
+import { parseCsvEnvelope } from "@/lib/csv-report";
 
 interface Props {
   appId: string;
   runId: string;
+  slug?: string;
 }
 
-export function LiveRunView({ appId, runId }: Props) {
+// Client-side mirror of outputLooksLikeHtmlReport.
+function isHtmlReport(output: string | null | undefined): boolean {
+  if (!output) return false;
+  const head = output.trimStart().slice(0, 200).toLowerCase();
+  return head.startsWith("<!doctype html") || head.startsWith("<html");
+}
+
+export function LiveRunView({ appId, runId, slug }: Props) {
   const router = useRouter();
   const [terminal, setTerminal] = useState<"completed" | "failed" | null>(null);
   const [output, setOutput] = useState<string | null>(null);
@@ -53,7 +64,33 @@ export function LiveRunView({ appId, runId }: Props) {
         </h2>
         <div className="card mt-2 max-h-[400px] overflow-auto p-4">
           {terminal === "completed" && output ? (
-            <MarkdownView content={output} />
+            (() => {
+              const csv = slug ? parseCsvEnvelope(output) : null;
+              if (csv && slug) {
+                return (
+                  <CsvDownloadBlock
+                    envelope={csv}
+                    downloadHref={`/agents/${slug}/runs/${runId}/csv`}
+                  />
+                );
+              }
+              if (isHtmlReport(output) && slug) {
+                return (
+                  <div className="space-y-2">
+                    <Link
+                      href={`/agents/${slug}/runs/${runId}/report`}
+                      className="inline-flex items-center gap-1 text-base font-semibold text-[color:var(--color-primary)] hover:underline"
+                    >
+                      View Report →
+                    </Link>
+                    <p className="text-xs text-[color:var(--color-muted-foreground)]">
+                      HTML report with charts
+                    </p>
+                  </div>
+                );
+              }
+              return <MarkdownView content={output} />;
+            })()
           ) : terminal === "failed" ? (
             <pre className="whitespace-pre-wrap text-sm">
               {errorMessage ?? "(run failed)"}

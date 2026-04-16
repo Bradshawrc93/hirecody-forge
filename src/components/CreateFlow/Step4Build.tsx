@@ -18,6 +18,45 @@ interface Props {
   appId?: string | null;
 }
 
+// Turn anything the build endpoint might return into a displayable string.
+// Obs 4xx responses occasionally include a ZodError flatten blob
+// ({ formErrors, fieldErrors }) under `details`, which crashes React if
+// rendered as a child.
+function formatBuildError(body: unknown): string {
+  if (!body || typeof body !== "object") return "The builder hit an error.";
+  const b = body as Record<string, unknown>;
+  const detail = b.details;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (detail && typeof detail === "object") {
+    const d = detail as { formErrors?: unknown; fieldErrors?: unknown };
+    const pieces: string[] = [];
+    if (Array.isArray(d.formErrors)) {
+      for (const m of d.formErrors) {
+        if (typeof m === "string") pieces.push(m);
+      }
+    }
+    if (d.fieldErrors && typeof d.fieldErrors === "object") {
+      for (const [field, msgs] of Object.entries(
+        d.fieldErrors as Record<string, unknown>
+      )) {
+        if (Array.isArray(msgs)) {
+          for (const m of msgs) {
+            if (typeof m === "string") pieces.push(`${field}: ${m}`);
+          }
+        }
+      }
+    }
+    if (pieces.length) return pieces.join(" • ");
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      /* fall through */
+    }
+  }
+  if (typeof b.error === "string" && b.error.trim()) return b.error;
+  return "The builder hit an error.";
+}
+
 const PULSE_PHRASES = [
   "Good things come to those who wait…",
   "Measuring twice, cutting once…",
@@ -83,7 +122,7 @@ export function Step4Build({
         });
         const body = await res.json();
         if (!res.ok) {
-          setError(body.details || body.error || "The builder hit an error.");
+          setError(formatBuildError(body));
           return null;
         }
         const result = { app_id: body.app_id, slug: body.slug };

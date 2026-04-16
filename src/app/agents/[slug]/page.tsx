@@ -6,7 +6,8 @@ import { findAgentBySlug } from "@/lib/agent-lookup";
 import { getAgent, listAgentRuns } from "@/lib/obs";
 import { getAgentKey } from "@/lib/kv";
 import { formatDuration, relativeTime, formatCost, formatScheduleTimeCT } from "@/lib/format";
-import { legacyInputTypeToConfig } from "@/components/CreateFlow/types";
+import { legacyInputTypeToConfig, normalizeInputConfig } from "@/components/CreateFlow/types";
+import { isAgentPlan } from "@/lib/agent-plan";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,6 +45,23 @@ export default async function AgentDetailPage({
   const runs = runsResp.runs;
   const latest = runs[0];
 
+  // Prefer the InputConfig embedded in the plan (includes slot labels).
+  // Fall back to the legacy input_type mapping for older agents.
+  const planInputConfig = isAgentPlan(agent.config)
+    ? agent.config.input_config
+    : undefined;
+  const inputConfig = planInputConfig
+    ? normalizeInputConfig(planInputConfig)
+    : legacyInputTypeToConfig(agent.input_type ?? "none");
+
+  // Prefer the plan's embedded output_type over Obs's stored value —
+  // Obs only knows the original enum, so csv/html_report agents would
+  // otherwise clone as "file" / "text".
+  const planOutputType = isAgentPlan(agent.config)
+    ? agent.config.output_type
+    : undefined;
+  const resolvedOutputType = planOutputType ?? agent.output_type;
+
   return (
     <main className="relative min-h-screen">
       <div className="mx-auto max-w-5xl px-6 pt-16 pb-16">
@@ -79,13 +97,13 @@ export default async function AgentDetailPage({
               slug={app.slug}
               agentName={app.display_name}
               status={agent.status}
-              inputConfig={legacyInputTypeToConfig(agent.input_type ?? "none")}
+              inputConfig={inputConfig}
               formSnapshot={{
                 display_name: app.display_name,
                 description: agent.description,
                 model: agent.model,
-                input_config: legacyInputTypeToConfig(agent.input_type ?? "none"),
-                output_type: agent.output_type,
+                input_config: inputConfig,
+                output_type: resolvedOutputType,
                 success_criteria: agent.success_criteria,
                 context_text: agent.context_text,
                 can_send_email: agent.can_send_email,
@@ -162,11 +180,10 @@ export default async function AgentDetailPage({
             <Row label="Model" value={agent.model ?? "—"} />
             <Row label="Input" value={
               (() => {
-                const ic = legacyInputTypeToConfig(agent.input_type ?? "none");
                 const parts = [
-                  ic.text.enabled && "text",
-                  ic.url.enabled && "url",
-                  ic.file.enabled && "file",
+                  inputConfig.text.enabled && "text",
+                  inputConfig.url.enabled && "url",
+                  inputConfig.file.enabled && "file",
                 ].filter(Boolean);
                 return parts.length ? parts.join(", ") : "none";
               })()

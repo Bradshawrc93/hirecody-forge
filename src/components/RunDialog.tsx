@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { InputConfig } from "@/components/CreateFlow/types";
 
 const ACCEPTED_EXTENSIONS = ".txt,.docx,.csv,.md";
+const ACCEPTED_EXT_LIST = [".txt", ".docx", ".csv", ".md"];
 
 function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -36,20 +37,36 @@ export function RunDialog({ appId, slug, agentName, inputConfig, onClose }: Prop
   const router = useRouter();
   const [inputText, setInputText] = useState("");
   const [inputUrl, setInputUrl] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [slotFiles, setSlotFiles] = useState<(File | null)[]>(() =>
+    inputConfig.file.enabled ? inputConfig.file.slots.map(() => null) : []
+  );
   const [busy, setBusy] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  const hasAnyInput = inputConfig.text.enabled || inputConfig.url.enabled || inputConfig.file.enabled;
+  const hasAnyInput =
+    inputConfig.text.enabled || inputConfig.url.enabled || inputConfig.file.enabled;
+
+  // Gate "Run" on required slots having a file.
+  const requiredSlotsSatisfied = inputConfig.file.enabled
+    ? inputConfig.file.slots.every((s, i) => !s.required || !!slotFiles[i])
+    : true;
 
   async function handleRun() {
     setBusy(true);
     try {
-      let fileText: string | null = null;
-      let fileName: string | null = null;
-      if (file) {
-        fileText = await readFileAsText(file);
-        fileName = file.name;
+      const files: { label: string; content: string; filename: string }[] = [];
+      if (inputConfig.file.enabled) {
+        for (let i = 0; i < inputConfig.file.slots.length; i++) {
+          const f = slotFiles[i];
+          const slot = inputConfig.file.slots[i];
+          if (!f) {
+            // Optional slot, left empty. Send an empty marker so the
+            // runtime can still expose the slot's label.
+            files.push({ label: slot.label, content: "", filename: "" });
+            continue;
+          }
+          const content = await readFileAsText(f);
+          files.push({ label: slot.label, content, filename: f.name });
+        }
       }
 
       const res = await fetch("/api/internal/run", {
@@ -60,8 +77,7 @@ export function RunDialog({ appId, slug, agentName, inputConfig, onClose }: Prop
           run_type: "manual",
           input_text: inputConfig.text.enabled ? inputText || null : null,
           input_url: inputConfig.url.enabled ? inputUrl || null : null,
-          file_text: fileText,
-          file_name: fileName,
+          files: inputConfig.file.enabled ? files : undefined,
         }),
       });
       const body = await res.json();
@@ -75,16 +91,23 @@ export function RunDialog({ appId, slug, agentName, inputConfig, onClose }: Prop
     }
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleSlotFileChange(
+    idx: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
     const f = e.target.files?.[0];
     if (!f) return;
     const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
-    if (![".txt", ".docx", ".csv", ".md"].includes(ext)) {
+    if (!ACCEPTED_EXT_LIST.includes(ext)) {
       alert("Unsupported file type. Supported: .txt, .docx, .csv, .md");
       e.target.value = "";
       return;
     }
-    setFile(f);
+    setSlotFiles((prev) => {
+      const next = [...prev];
+      next[idx] = f;
+      return next;
+    });
   }
 
   return (
@@ -134,27 +157,41 @@ export function RunDialog({ appId, slug, agentName, inputConfig, onClose }: Prop
           </div>
         )}
 
+        {inputConfig.file.enabled &&
+          inputConfig.file.slots.map((slot, idx) => {
+            const file = slotFiles[idx];
+            const labelText = slot.label || `File ${idx + 1}`;
+            return (
+              <div key={idx}>
+                <label className="label">
+                  {labelText}
+                  {slot.required ? (
+                    <span className="ml-1 text-[#B3413A]">*</span>
+                  ) : (
+                    <span className="ml-1 text-[color:var(--color-muted-foreground)]">
+                      (optional)
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="file"
+                  accept={ACCEPTED_EXTENSIONS}
+                  className="input"
+                  onChange={(e) => handleSlotFileChange(idx, e)}
+                />
+                {file && (
+                  <p className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
+                    {file.name} — {(file.size / 1024).toFixed(1)} KB
+                  </p>
+                )}
+              </div>
+            );
+          })}
+
         {inputConfig.file.enabled && (
-          <div>
-            <label className="label">
-              {inputConfig.file.label || "Upload a file"}
-            </label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept={ACCEPTED_EXTENSIONS}
-              className="input"
-              onChange={handleFileChange}
-            />
-            {file && (
-              <p className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
-                {file.name} — {(file.size / 1024).toFixed(1)} KB
-              </p>
-            )}
-            <p className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
-              Supported: .txt, .docx, .csv, .md
-            </p>
-          </div>
+          <p className="text-xs text-[color:var(--color-muted-foreground)]">
+            Supported: .txt, .docx, .csv, .md
+          </p>
         )}
 
         <div className="flex justify-end gap-2 pt-2">
@@ -170,7 +207,7 @@ export function RunDialog({ appId, slug, agentName, inputConfig, onClose }: Prop
             type="button"
             className="btn-primary"
             onClick={handleRun}
-            disabled={busy}
+            disabled={busy || !requiredSlotsSatisfied}
           >
             {busy ? "Starting…" : "Run Agent"}
           </button>

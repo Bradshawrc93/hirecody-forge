@@ -4,9 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { Waterfall } from "@/components/Waterfall";
 import { MarkdownView } from "@/components/MarkdownView";
+import { CsvDownloadBlock } from "@/components/CsvDownloadBlock";
+import { parseCsvEnvelope } from "@/lib/csv-report";
 import type { FormState } from "./types";
 
 const ACCEPTED_EXTENSIONS = ".txt,.docx,.csv,.md";
+const ACCEPTED_EXT_LIST = [".txt", ".docx", ".csv", ".md"];
+
+// Client-side mirror of outputLooksLikeHtmlReport (the server helper lives
+// in lib/html-report.ts behind server-only).
+function isHtmlReport(output: string | null | undefined): boolean {
+  if (!output) return false;
+  const head = output.trimStart().slice(0, 200).toLowerCase();
+  return head.startsWith("<!doctype html") || head.startsWith("<html");
+}
 
 function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -48,7 +59,11 @@ export function Step5Test({
   const [runId, setRunId] = useState<string | null>(null);
   const [inputText, setInputText] = useState("");
   const [inputUrl, setInputUrl] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [slotFiles, setSlotFiles] = useState<(File | null)[]>(() =>
+    form.input_config.file.enabled
+      ? form.input_config.file.slots.map(() => null)
+      : []
+  );
   const [terminal, setTerminal] = useState<"completed" | "failed" | null>(null);
   const [output, setOutput] = useState<string | null>(null);
   const [thumbsDown, setThumbsDown] = useState(false);
@@ -58,16 +73,26 @@ export function Step5Test({
 
   const ic = form.input_config;
   const hasAnyInput = ic.text.enabled || ic.url.enabled || ic.file.enabled;
+  const requiredSlotsSatisfied = ic.file.enabled
+    ? ic.file.slots.every((s, i) => !s.required || !!slotFiles[i])
+    : true;
 
   async function startRun() {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    let fileText: string | null = null;
-    let fileName: string | null = null;
-    if (file) {
-      fileText = await readFileAsText(file);
-      fileName = file.name;
+    const files: { label: string; content: string; filename: string }[] = [];
+    if (ic.file.enabled) {
+      for (let i = 0; i < ic.file.slots.length; i++) {
+        const f = slotFiles[i];
+        const slot = ic.file.slots[i];
+        if (!f) {
+          files.push({ label: slot.label, content: "", filename: "" });
+          continue;
+        }
+        const content = await readFileAsText(f);
+        files.push({ label: slot.label, content, filename: f.name });
+      }
     }
 
     const res = await fetch("/api/internal/run", {
@@ -78,12 +103,30 @@ export function Step5Test({
         run_type: "test",
         input_text: ic.text.enabled ? inputText || null : null,
         input_url: ic.url.enabled ? inputUrl || null : null,
-        file_text: fileText,
-        file_name: fileName,
+        files: ic.file.enabled ? files : undefined,
       }),
     });
     const body = await res.json();
     if (res.ok) setRunId(body.run_id);
+  }
+
+  function handleSlotFileChange(
+    idx: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
+    if (!ACCEPTED_EXT_LIST.includes(ext)) {
+      alert("Unsupported file type. Supported: .txt, .docx, .csv, .md");
+      e.target.value = "";
+      return;
+    }
+    setSlotFiles((prev) => {
+      const next = [...prev];
+      next[idx] = f;
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -206,37 +249,48 @@ export function Step5Test({
             />
           </div>
         )}
+        {ic.file.enabled &&
+          ic.file.slots.map((slot, idx) => {
+            const f = slotFiles[idx];
+            const labelText = slot.label || `File ${idx + 1}`;
+            return (
+              <div key={idx}>
+                <label className="label">
+                  {labelText}
+                  {slot.required ? (
+                    <span className="ml-1 text-[#B3413A]">*</span>
+                  ) : (
+                    <span className="ml-1 text-[color:var(--color-muted-foreground)]">
+                      (optional)
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="file"
+                  accept={ACCEPTED_EXTENSIONS}
+                  className="input"
+                  onChange={(e) => handleSlotFileChange(idx, e)}
+                />
+                {f && (
+                  <p className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
+                    {f.name} — {(f.size / 1024).toFixed(1)} KB
+                  </p>
+                )}
+              </div>
+            );
+          })}
         {ic.file.enabled && (
-          <div>
-            <label className="label">{ic.file.label || "Upload a file"}</label>
-            <input
-              type="file"
-              accept={ACCEPTED_EXTENSIONS}
-              className="input"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
-                if (![".txt", ".docx", ".csv", ".md"].includes(ext)) {
-                  alert("Unsupported file type. Supported: .txt, .docx, .csv, .md");
-                  e.target.value = "";
-                  return;
-                }
-                setFile(f);
-              }}
-            />
-            {file && (
-              <p className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
-                {file.name} — {(file.size / 1024).toFixed(1)} KB
-              </p>
-            )}
-            <p className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
-              Supported: .txt, .docx, .csv, .md
-            </p>
-          </div>
+          <p className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
+            Supported: .txt, .docx, .csv, .md
+          </p>
         )}
         <div className="flex justify-end">
-          <button type="button" className="btn-primary" onClick={startRun}>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={startRun}
+            disabled={!requiredSlotsSatisfied}
+          >
             Run Test
           </button>
         </div>
@@ -263,7 +317,30 @@ export function Step5Test({
                 (loading…)
               </p>
             ) : terminal === "completed" ? (
-              <MarkdownView content={output} />
+              (() => {
+                const csv = parseCsvEnvelope(output);
+                if (csv) {
+                  return (
+                    <CsvDownloadBlock
+                      envelope={csv}
+                      downloadHref={`/agents/${slug}/runs/${runId}/csv`}
+                    />
+                  );
+                }
+                if (isHtmlReport(output)) {
+                  return (
+                    <a
+                      href={`/agents/${slug}/runs/${runId}/report`}
+                      target="_blank"
+                      rel="noopener"
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--color-primary)] hover:underline"
+                    >
+                      View Report →
+                    </a>
+                  );
+                }
+                return <MarkdownView content={output} />;
+              })()
             ) : (
               <pre className="whitespace-pre-wrap text-sm">{output}</pre>
             )}

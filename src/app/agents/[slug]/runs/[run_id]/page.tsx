@@ -10,6 +10,9 @@ import { getRun, getSteps } from "@/lib/obs";
 import { getAgentKey } from "@/lib/kv";
 import { formatCost, formatDuration, relativeTime } from "@/lib/format";
 import { explainFailure } from "@/lib/failure-explainer";
+import { outputLooksLikeHtmlReport } from "@/lib/html-report";
+import { parseCsvEnvelope } from "@/lib/csv-report";
+import { CsvDownloadBlock } from "@/components/CsvDownloadBlock";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -80,7 +83,7 @@ export default async function RunDetailPage({
         )}
 
         {isLive ? (
-          <LiveRunView appId={lean.app_id} runId={run_id} />
+          <LiveRunView appId={lean.app_id} runId={run_id} slug={slug} />
         ) : (
           <>
             <section className="mt-6">
@@ -89,7 +92,34 @@ export default async function RunDetailPage({
               </h2>
               <div className="card mt-2 max-h-[400px] overflow-auto p-4">
                 {run.status === "completed" && run.output ? (
-                  <MarkdownView content={run.output} />
+                  (() => {
+                    const csv = parseCsvEnvelope(run.output);
+                    if (csv) {
+                      return (
+                        <CsvDownloadBlock
+                          envelope={csv}
+                          downloadHref={`/agents/${slug}/runs/${run_id}/csv`}
+                        />
+                      );
+                    }
+                    if (outputLooksLikeHtmlReport(run.output)) {
+                      return (
+                        <div className="space-y-2">
+                          <Link
+                            href={`/agents/${slug}/runs/${run_id}/report`}
+                            className="inline-flex items-center gap-1 text-base font-semibold text-[color:var(--color-primary)] hover:underline"
+                          >
+                            View Report →
+                          </Link>
+                          <p className="text-xs text-[color:var(--color-muted-foreground)]">
+                            HTML report with charts — generated{" "}
+                            {relativeTime(run.completed_at)}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return <MarkdownView content={run.output} />;
+                  })()
                 ) : (
                   <pre className="whitespace-pre-wrap text-sm">
                     {run.output ?? run.error_message ?? "(no output)"}

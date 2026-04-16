@@ -9,6 +9,8 @@ import {
   type RunStatus,
 } from "./obs";
 import type { AgentPlan, PlanStep } from "./agent-plan";
+import { prepareHtmlReport } from "./html-report";
+import { buildCsvEnvelope, CSV_ROW_LIMIT } from "./csv-report";
 
 // Tiny templating: replace {{var}} with the variable bag.
 function render(template: string, vars: Record<string, string>): string {
@@ -23,13 +25,44 @@ function markdownToEmailHtml(md: string): string {
   return `<!doctype html><html><body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a;background:#ffffff;"><div style="max-width:640px;margin:0 auto;">${inner}</div></body></html>`;
 }
 
+// Short notification email used when the agent produces an HTML report.
+// Linking is more reliable than inlining Chart.js-heavy HTML into Gmail.
+function reportNotificationEmailHtml(agentName: string, reportUrl: string): string {
+  const safeName = agentName.replace(/[<>&"']/g, "");
+  return `<!doctype html><html><body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a;background:#ffffff;"><div style="max-width:640px;margin:0 auto;"><p style="margin:0 0 16px;">Your ${safeName} report is ready.</p><p style="margin:16px 0;"><a href="${reportUrl}" style="display:inline-block;background:#C56A2D;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Report</a></p><p style="margin:16px 0 0;font-size:12px;color:#666;">This link opens the full interactive report in your browser.</p></div></body></html>`;
+}
+
+// Short notification email for CSV output. The Obs email API does not
+// currently support attachments, so the spec's "attach the CSV" becomes
+// "link to the download endpoint" here (documented in the spec's open
+// questions). The download link serves the CSV with the right filename.
+function csvNotificationEmailHtml(
+  agentName: string,
+  downloadUrl: string,
+  rowCount: number,
+  columnCount: number,
+  filename: string
+): string {
+  const safeName = agentName.replace(/[<>&"']/g, "");
+  const safeFilename = filename.replace(/[<>&"']/g, "");
+  return `<!doctype html><html><body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a;background:#ffffff;"><div style="max-width:640px;margin:0 auto;"><p style="margin:0 0 16px;">Your ${safeName} CSV is ready. ${rowCount} rows, ${columnCount} columns.</p><p style="margin:16px 0;"><a href="${downloadUrl}" style="display:inline-block;background:#C56A2D;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Download CSV</a></p><p style="margin:16px 0 0;font-size:12px;color:#666;">${safeFilename}</p></div></body></html>`;
+}
+
+export interface ExecutionFile {
+  label: string;
+  content: string;
+  filename: string;
+}
+
 interface ExecutionInput {
   runId: string;
   apiKey: string;
+  // agent slug — needed to build absolute report-viewer URLs for email.
+  slug?: string;
   plan: AgentPlan;
   inputText?: string | null;
   inputUrl?: string | null;
-  fileText?: string | null;
+  files?: ExecutionFile[];
   verifiedEmail?: string | null;
 }
 
@@ -133,15 +166,61 @@ async function runWebFetchStep(
   return text.length > 50000 ? text.slice(0, 50000) + "\n…[truncated]" : text;
 }
 
+// Derive the app's public base URL for building the email's report link.
+// Vercel provides VERCEL_URL without scheme; prefer an explicit
+// FORGE_APP_BASE_URL override for staging/prod.
+function resolveAppBaseUrl(): string {
+  if (process.env.FORGE_APP_BASE_URL) {
+    return process.env.FORGE_APP_BASE_URL.replace(/\/$/, "");
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return "http://localhost:3000";
+}
+
+// LLMs routinely truncate long HTML/CSV envelopes when max_tokens is too
+// low. For HTML, a truncated <script> kills every Chart.js init; for CSV,
+// a truncated row array blows up JSON.parse. If the plan ends in (or
+// contains) an html_report or csv_report step, floor every LLM step's
+// max_tokens so the model has room to emit the full document. Providers
+// only bill for *generated* tokens, so raising the ceiling is cheap.
+const STRUCTURED_REPORT_MIN_MAX_TOKENS = 16000;
+function ensureStructuredReportCapacity(plan: AgentPlan): AgentPlan {
+  const hasStructured = plan.steps.some(
+    (s) => s.type === "html_report" || s.type === "csv_report"
+  );
+  if (!hasStructured) return plan;
+  const bumped = plan.steps.map((s) => {
+    if (s.type === "llm") {
+      const cur = s.max_tokens ?? 1024;
+      if (cur < STRUCTURED_REPORT_MIN_MAX_TOKENS) {
+        return { ...s, max_tokens: STRUCTURED_REPORT_MIN_MAX_TOKENS };
+      }
+    }
+    return s;
+  });
+  return { ...plan, steps: bumped };
+}
+
 export async function executeAgent(
   input: ExecutionInput
 ): Promise<ExecutionResult> {
-  const { runId, apiKey, plan, inputText, inputUrl, fileText, verifiedEmail } = input;
+  const { runId, apiKey, slug, inputText, inputUrl, files, verifiedEmail } = input;
+  const plan = ensureStructuredReportCapacity(input.plan);
   const runStart = Date.now();
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let totalCost = 0;
   let finalOutput = "";
+  let outputIsHtmlReport = false;
+  let csvMeta: {
+    filename: string;
+    row_count: number;
+    column_count: number;
+    columns: string[];
+    truncated: boolean;
+  } | null = null;
 
   // Mark run as running.
   await patchRun(runId, apiKey, {
@@ -152,8 +231,19 @@ export async function executeAgent(
   const vars: Record<string, string> = {
     input_text: inputText ?? "",
     input_url: inputUrl ?? "",
-    file_text: fileText ?? "",
   };
+
+  // Map the files array into file_1/file_1_label/... template vars.
+  // Also keep file_text pointing at the first file for backwards compat
+  // with plans built before multi-file support.
+  const filesArr = files ?? [];
+  vars.file_text = filesArr[0]?.content ?? "";
+  for (let i = 0; i < filesArr.length; i++) {
+    const f = filesArr[i];
+    vars[`file_${i + 1}`] = f.content ?? "";
+    vars[`file_${i + 1}_label`] = f.label ?? "";
+    vars[`file_${i + 1}_filename`] = f.filename ?? "";
+  }
 
   try {
     for (const step of plan.steps) {
@@ -177,8 +267,13 @@ export async function executeAgent(
         startMeta.subject_preview = render(step.subject_template, vars).slice(0, 200);
       } else if (step.type === "output") {
         startMeta.template_preview = render(step.template, vars).slice(0, 400);
+      } else if (step.type === "html_report") {
+        startMeta.template_preview = render(step.template, vars).slice(0, 400);
+      } else if (step.type === "csv_report") {
+        startMeta.template_preview = render(step.template, vars).slice(0, 400);
       } else if (step.type === "file_read") {
-        startMeta.bytes = (fileText ?? "").length;
+        startMeta.bytes = filesArr.reduce((n, f) => n + (f.content?.length ?? 0), 0);
+        startMeta.file_count = filesArr.length;
         if (step.output_var) startMeta.output_var = step.output_var;
       }
 
@@ -206,23 +301,88 @@ export async function executeAgent(
           producedOutput = await runWebFetchStep(step, vars);
           if (step.output_var) vars[step.output_var] = producedOutput;
         } else if (step.type === "file_read") {
-          producedOutput = fileText ?? "";
+          // Concatenate all files with clear labels so the LLM sees each
+          // one's semantic meaning. The individual file_N vars are still
+          // available for plans that prefer to reference them directly.
+          if (filesArr.length === 0) {
+            producedOutput = "";
+          } else if (filesArr.length === 1) {
+            producedOutput = filesArr[0].content ?? "";
+          } else {
+            producedOutput = filesArr
+              .map((f, i) => {
+                const header = f.label
+                  ? `--- File ${i + 1}: ${f.label}${f.filename ? ` (${f.filename})` : ""} ---`
+                  : `--- File ${i + 1}${f.filename ? `: ${f.filename}` : ""} ---`;
+                return `${header}\n${f.content ?? ""}`;
+              })
+              .join("\n\n");
+          }
           if (step.output_var) vars[step.output_var] = producedOutput;
         } else if (step.type === "email") {
           const rawSubject = render(step.subject_template, vars);
           const subject = rawSubject.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
-          const bodyMarkdown = render(step.body_template, vars);
-          const bodyHtml = markdownToEmailHtml(bodyMarkdown);
+          // If we've already produced an HTML report or a CSV, send a
+          // link email instead of inlining heavy HTML or raw CSV text.
+          // (Obs's email API doesn't support attachments yet — documented
+          // in the CSV spec's open questions — so CSV becomes a download
+          // link for now.)
+          let bodyMarkdown: string;
+          let bodyHtml: string;
+          if (outputIsHtmlReport && slug) {
+            const reportUrl = `${resolveAppBaseUrl()}/agents/${slug}/runs/${runId}/report`;
+            bodyMarkdown = `Your report is ready.\n\nView Report: ${reportUrl}`;
+            bodyHtml = reportNotificationEmailHtml(subject || "Forge", reportUrl);
+          } else if (csvMeta && slug) {
+            const downloadUrl = `${resolveAppBaseUrl()}/agents/${slug}/runs/${runId}/csv`;
+            bodyMarkdown = `Your CSV is attached. ${csvMeta.row_count} rows, ${csvMeta.column_count} columns.\n\nDownload: ${downloadUrl}`;
+            bodyHtml = csvNotificationEmailHtml(
+              subject || "Forge",
+              downloadUrl,
+              csvMeta.row_count,
+              csvMeta.column_count,
+              csvMeta.filename
+            );
+          } else {
+            bodyMarkdown = render(step.body_template, vars);
+            bodyHtml = markdownToEmailHtml(bodyMarkdown);
+          }
           const sendRes = await emailSendResult(apiKey, {
             subject,
             body: bodyHtml,
             format: "html",
           });
           producedOutput = `To: ${verifiedEmail ?? "(no verified email)"}\nSubject: ${subject}\n\n${bodyMarkdown}`;
-          finalOutput = producedOutput;
+          if (!outputIsHtmlReport && !csvMeta) {
+            finalOutput = producedOutput;
+          }
           eventRef = sendRes.message_id;
         } else if (step.type === "output") {
           producedOutput = render(step.template, vars);
+          finalOutput = producedOutput;
+        } else if (step.type === "html_report") {
+          const rendered = render(step.template, vars);
+          producedOutput = prepareHtmlReport(rendered);
+          finalOutput = producedOutput;
+          outputIsHtmlReport = true;
+        } else if (step.type === "csv_report") {
+          const rendered = render(step.template, vars);
+          const envelope = buildCsvEnvelope({
+            llmOutput: rendered,
+            slug: slug ?? null,
+            completedAt: new Date(),
+          });
+          csvMeta = {
+            filename: envelope.filename,
+            row_count: envelope.row_count,
+            column_count: envelope.column_count,
+            columns: envelope.columns,
+            truncated: envelope.truncated,
+          };
+          // Store the full envelope (including CSV text) as run.output so
+          // the run page and download endpoint can reconstruct everything
+          // without extra artifact storage.
+          producedOutput = JSON.stringify(envelope);
           finalOutput = producedOutput;
         }
 
@@ -233,13 +393,22 @@ export async function executeAgent(
           output_chars: producedOutput?.length ?? 0,
         };
         if (step.type === "llm") {
-          // tokens/cost are recorded on the run; nothing extra to carry here
-          // since the live run already folds these into the totals — but we
-          // do want the prompt too, so re-attach it for the detail panel.
           completeMeta.prompt_preview = render(step.prompt, vars).slice(0, 800);
           completeMeta.model = plan.model;
         } else if (step.type === "web_fetch") {
           completeMeta.url = render(step.url, vars);
+        } else if (step.type === "html_report") {
+          completeMeta.output_type = "html_report";
+        } else if (step.type === "csv_report") {
+          completeMeta.output_type = "csv";
+          if (csvMeta) {
+            completeMeta.filename = csvMeta.filename;
+            completeMeta.row_count = csvMeta.row_count;
+            completeMeta.column_count = csvMeta.column_count;
+            completeMeta.columns = csvMeta.columns;
+            completeMeta.truncated = csvMeta.truncated;
+            completeMeta.row_limit = CSV_ROW_LIMIT;
+          }
         }
         await postStep(runId, apiKey, {
           step_name: step.name,
@@ -310,4 +479,3 @@ export async function executeAgent(
     };
   }
 }
-

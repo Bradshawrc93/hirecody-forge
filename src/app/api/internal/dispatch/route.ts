@@ -56,10 +56,14 @@ export async function GET(req: Request) {
     if (queued.length === 0) continue;
 
     let plan;
+    let slug: string | undefined;
+    let verifiedEmail: string | null | undefined;
     try {
       const info = await getAgent(appId, apiKey);
       if (!isAgentPlan(info.agent.config)) continue;
       plan = info.agent.config;
+      slug = info.app.slug;
+      verifiedEmail = info.agent.verified_email;
     } catch {
       continue;
     }
@@ -72,7 +76,9 @@ export async function GET(req: Request) {
       const result = await executeAgent({
         runId: run.id,
         apiKey,
+        slug,
         plan,
+        verifiedEmail,
       });
       executed.push({ app_id: appId, run_id: run.id, status: result.status });
     }

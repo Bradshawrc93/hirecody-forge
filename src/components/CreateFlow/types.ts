@@ -7,30 +7,60 @@ export interface TextInputConfig extends InputTypeConfig {
   size: "short" | "long";
 }
 
+export interface FileSlot {
+  label: string;
+  required: boolean;
+}
+
+export interface FileInputConfig {
+  enabled: boolean;
+  slots: FileSlot[];
+}
+
+export const MAX_FILE_SLOTS = 5;
+
 export interface InputConfig {
   text: TextInputConfig;
   url: InputTypeConfig;
-  file: InputTypeConfig;
+  file: FileInputConfig;
 }
 
 export const DEFAULT_INPUT_CONFIG: InputConfig = {
   text: { enabled: false, size: "short" },
   url: { enabled: false },
-  file: { enabled: false },
+  file: { enabled: false, slots: [] },
 };
 
 export type LegacyInputType = "none" | "text" | "file" | "both";
 
+// Older agents (or Obs returning the legacy input_type) have no slot info.
+// Produce a single required unnamed slot so the UI has something to render.
+function defaultFileSlots(): FileSlot[] {
+  return [{ label: "", required: true }];
+}
+
 export function legacyInputTypeToConfig(input_type: LegacyInputType): InputConfig {
   switch (input_type) {
     case "text":
-      return { text: { enabled: true, size: "short" }, url: { enabled: false }, file: { enabled: false } };
+      return {
+        text: { enabled: true, size: "short" },
+        url: { enabled: false },
+        file: { enabled: false, slots: [] },
+      };
     case "file":
-      return { text: { enabled: false, size: "short" }, url: { enabled: false }, file: { enabled: true } };
+      return {
+        text: { enabled: false, size: "short" },
+        url: { enabled: false },
+        file: { enabled: true, slots: defaultFileSlots() },
+      };
     case "both":
-      return { text: { enabled: true, size: "short" }, url: { enabled: false }, file: { enabled: true } };
+      return {
+        text: { enabled: true, size: "short" },
+        url: { enabled: false },
+        file: { enabled: true, slots: defaultFileSlots() },
+      };
     default:
-      return { ...DEFAULT_INPUT_CONFIG };
+      return { ...DEFAULT_INPUT_CONFIG, file: { enabled: false, slots: [] } };
   }
 }
 
@@ -41,6 +71,55 @@ export function inputConfigToLegacy(config: InputConfig): LegacyInputType {
   if (t) return "text";
   if (f) return "file";
   return "none";
+}
+
+// Normalize a possibly-stale file input config (older shape with a single
+// `label` string) into the new slots array. Safe to call on already-new
+// configs; idempotent.
+type LegacyFileShape = {
+  enabled?: boolean;
+  label?: string;
+  slots?: FileSlot[];
+};
+
+export function legacyFileConfigToSlots(file: LegacyFileShape | undefined): FileInputConfig {
+  if (!file) return { enabled: false, slots: [] };
+  if (Array.isArray(file.slots)) {
+    return {
+      enabled: !!file.enabled,
+      slots: file.slots.map((s) => ({
+        label: typeof s?.label === "string" ? s.label : "",
+        required: s?.required !== false,
+      })),
+    };
+  }
+  // Old shape: { enabled, label? }
+  if (file.enabled) {
+    return {
+      enabled: true,
+      slots: [{ label: file.label ?? "", required: true }],
+    };
+  }
+  return { enabled: false, slots: [] };
+}
+
+// Normalize any InputConfig blob (from Obs, from the builder, from clone
+// session storage) to the current shape. Idempotent.
+export function normalizeInputConfig(raw: unknown): InputConfig {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_INPUT_CONFIG };
+  const r = raw as Partial<InputConfig> & { file?: LegacyFileShape };
+  return {
+    text: {
+      enabled: !!r.text?.enabled,
+      size: r.text?.size === "long" ? "long" : "short",
+      label: r.text?.label,
+    },
+    url: {
+      enabled: !!r.url?.enabled,
+      label: r.url?.label,
+    },
+    file: legacyFileConfigToSlots(r.file),
+  };
 }
 
 export interface FormState {
@@ -61,7 +140,7 @@ export interface FormState {
   verified_email: string | null;
   // Step 3
   success_criteria: string;
-  output_type: "text" | "file" | "email" | "notification" | "side-effect";
+  output_type: "text" | "file" | "email" | "notification" | "html_report" | "csv" | "side-effect";
   context_text: string;
 }
 

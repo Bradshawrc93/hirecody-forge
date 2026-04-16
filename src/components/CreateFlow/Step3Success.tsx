@@ -9,6 +9,30 @@ interface Props {
   onBack: () => void;
 }
 
+type OutputOption = {
+  value: FormState["output_type"];
+  label: string;
+  helper?: string;
+  emailHelper?: string;
+};
+
+// Order matches the CSV spec's Step 3 layout. `notification` and
+// `side-effect` exist in the FormState union for Obs compatibility but
+// have no engine behavior yet, so they're omitted from the picker.
+const OUTPUT_OPTIONS: OutputOption[] = [
+  { value: "text", label: "Text / markdown" },
+  { value: "file", label: "File" },
+  {
+    value: "csv",
+    label: "CSV — spreadsheet file",
+    helper:
+      "Your agent will produce a CSV file (openable in Excel/Sheets). The LLM decides the columns based on your success criteria.",
+    emailHelper: "CSV will be attached to the notification email.",
+  },
+  { value: "html_report", label: "HTML report" },
+  { value: "email", label: "Email" },
+];
+
 export function Step3Success({ form, setForm, onNext, onBack }: Props) {
   const canContinue = form.success_criteria.trim().length > 0;
   const ctxLen = form.context_text.length;
@@ -32,6 +56,43 @@ export function Step3Success({ form, setForm, onNext, onBack }: Props) {
         />
         <div className="mt-1 text-xs text-[color:var(--color-muted-foreground)]">
           {form.success_criteria.length}/300
+        </div>
+      </div>
+
+      <div>
+        <label className="label">What should the agent output?</label>
+        <div className="mt-1 space-y-2">
+          {OUTPUT_OPTIONS.map((opt) => {
+            const selected = form.output_type === opt.value;
+            return (
+              <label
+                key={opt.value}
+                className="flex cursor-pointer items-start gap-2 text-sm"
+              >
+                <input
+                  type="radio"
+                  className="mt-1"
+                  name="output_type"
+                  value={opt.value}
+                  checked={selected}
+                  onChange={() => setForm({ ...form, output_type: opt.value })}
+                />
+                <span>
+                  <span>{opt.label}</span>
+                  {selected && opt.helper && (
+                    <span className="mt-1 block text-xs text-[color:var(--color-muted-foreground)]">
+                      {opt.helper}
+                    </span>
+                  )}
+                  {selected && opt.emailHelper && form.can_send_email && (
+                    <span className="mt-1 block text-xs text-[color:var(--color-muted-foreground)]">
+                      {opt.emailHelper}
+                    </span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
         </div>
       </div>
 

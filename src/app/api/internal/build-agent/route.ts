@@ -1,19 +1,37 @@
 import { NextResponse } from "next/server";
 import {
   createAgent,
+  deleteAgent,
   patchAgent,
   postBuild,
   ObsError,
   type CreateAgentInput,
   type AgentRecord,
 } from "@/lib/obs";
-import { setAgentKey } from "@/lib/kv";
+import { deleteAgentKey, setAgentKey } from "@/lib/kv";
 import { buildAgentPlan } from "@/lib/builder";
 import { safetyCheck } from "@/lib/guardrail";
 import { BUILDER_MODEL } from "@/lib/anthropic";
 import { slugify } from "@/lib/format";
 import type { InputConfig } from "@/components/CreateFlow/types";
 import { inputConfigToLegacy } from "@/components/CreateFlow/types";
+import type { OutputType } from "@/lib/obs";
+
+// Obs's agent schema only knows the original output_type enum. Newer
+// Forge-only values (html_report, csv) map down to the closest Obs
+// equivalent here; the real value is embedded in the plan for rebuild.
+function toObsOutputType(
+  t: RequestBody["output_type"]
+): OutputType {
+  switch (t) {
+    case "html_report":
+      return "text";
+    case "csv":
+      return "file";
+    default:
+      return t;
+  }
+}
 
 interface RequestBody {
   // Step 1
@@ -33,7 +51,7 @@ interface RequestBody {
   verified_email: string | null;
   // Step 3
   success_criteria: string;
-  output_type: "text" | "file" | "email" | "notification" | "side-effect";
+  output_type: "text" | "file" | "email" | "notification" | "html_report" | "csv" | "side-effect";
   context_text: string | null;
   user_feedback?: string | null;
 }
@@ -75,7 +93,7 @@ export async function POST(req: Request) {
     can_send_email: body.can_send_email,
     has_web_access: body.has_web_access,
     success_criteria: body.success_criteria,
-    output_type: body.output_type,
+    output_type: toObsOutputType(body.output_type),
     context_text: body.context_text,
     schedule_cadence: body.schedule_cadence,
     schedule_time: body.schedule_time,
@@ -148,7 +166,9 @@ export async function POST(req: Request) {
       user_feedback: body.user_feedback ?? null,
     });
   } catch (e) {
-    // Log the failed build attempt.
+    // Log the failed build attempt for telemetry, then delete the orphan
+    // agent. Otherwise the user is left with a "build_failed" row in the
+    // sidebar and the next retry collides on the slug → "-2" suffixes.
     await postBuild(app.id, apiKey, {
       attempt_number: 1,
       prompt: body.description,
@@ -161,12 +181,12 @@ export async function POST(req: Request) {
       status: "failed",
       error_message: String(e),
     }).catch(() => undefined);
+    await deleteAgent(app.id, apiKey).catch(() => undefined);
+    await deleteAgentKey(app.id).catch(() => undefined);
     return NextResponse.json(
       {
         error: "builder_failed",
         details: String(e),
-        app_id: app.id,
-        slug: app.slug,
       },
       { status: 500 }
     );

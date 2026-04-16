@@ -4,7 +4,7 @@ import { getAgentKey } from "@/lib/kv";
 import { buildAgentPlan } from "@/lib/builder";
 import { BUILDER_MODEL } from "@/lib/anthropic";
 import { isAgentPlan, type AgentPlan } from "@/lib/agent-plan";
-import { legacyInputTypeToConfig } from "@/components/CreateFlow/types";
+import { legacyInputTypeToConfig, normalizeInputConfig } from "@/components/CreateFlow/types";
 
 interface RequestBody {
   app_id: string;
@@ -45,6 +45,12 @@ export async function POST(req: Request) {
 
   const previousPlan: AgentPlan | null = isAgentPlan(agent.config) ? agent.config : null;
 
+  // Prefer the InputConfig stored on the previous plan (includes slot
+  // labels); fall back to the legacy input_type mapping otherwise.
+  const inputConfig = previousPlan?.input_config
+    ? normalizeInputConfig(previousPlan.input_config)
+    : legacyInputTypeToConfig(agent.input_type ?? "none");
+
   let buildResult;
   try {
     buildResult = await buildAgentPlan({
@@ -54,10 +60,13 @@ export async function POST(req: Request) {
       context_text: agent.context_text ?? null,
       needs_llm: agent.needs_llm ?? true,
       model: agent.model ?? "claude-sonnet-4-6",
-      input_config: legacyInputTypeToConfig(agent.input_type ?? "none"),
+      input_config: inputConfig,
       can_send_email: agent.can_send_email ?? false,
       has_web_access: agent.has_web_access ?? false,
-      output_type: agent.output_type ?? "text",
+      // Prefer the forge-level output_type embedded in the plan over
+      // Obs's stored value — Obs down-maps csv → file and html_report →
+      // text, so its record would lose fidelity on rebuild.
+      output_type: previousPlan?.output_type ?? agent.output_type ?? "text",
       verified_email: agent.verified_email ?? null,
       user_feedback: body.user_feedback,
       previous_plan: previousPlan,
