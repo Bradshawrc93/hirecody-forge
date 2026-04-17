@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createRun, getAgent, ObsError, type RunType } from "@/lib/obs";
 import { getAgentKey } from "@/lib/kv";
 import { executeAgent, type ExecutionFile } from "@/lib/execution-engine";
@@ -23,7 +23,7 @@ interface Body {
   file_name?: string | null;
 }
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 async function materializeFile(
   content: string,
@@ -108,16 +108,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "file_parse_failed" }, { status: 400 });
   }
 
-  executeAgent({
-    runId: run.id,
-    apiKey,
-    slug: agentInfo.app.slug,
-    plan,
-    inputText: body.input_text,
-    inputUrl: body.input_url,
-    files: executionFiles,
-    verifiedEmail: agentInfo.agent.verified_email,
-  }).catch((err) => console.error("execution error", err));
+  after(
+    executeAgent({
+      runId: run.id,
+      apiKey,
+      slug: agentInfo.app.slug,
+      plan,
+      inputText: body.input_text,
+      inputUrl: body.input_url,
+      files: executionFiles,
+      verifiedEmail: agentInfo.agent.verified_email,
+    }).catch((err) => console.error("execution error", err))
+  );
 
   return NextResponse.json({ run_id: run.id });
 }

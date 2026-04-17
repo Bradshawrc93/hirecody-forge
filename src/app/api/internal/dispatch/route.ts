@@ -4,7 +4,7 @@ import { getAgent, listAgentRuns } from "@/lib/obs";
 import { isAgentPlan } from "@/lib/agent-plan";
 import { executeAgent } from "@/lib/execution-engine";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Vercel cron hits this every 5 minutes. We pick up `queued` scheduled
 // runs for KV-known agents and execute them serially. Bail before the
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   }
 
   const startedAt = Date.now();
-  const BAIL_AT_MS = 50_000;
+  const BAIL_AT_MS = 280_000;
   const executed: { app_id: string; run_id: string; status: string }[] = [];
   const skipped: string[] = [];
 
