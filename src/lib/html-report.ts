@@ -1,11 +1,11 @@
 // Helpers for the html_report output type. Runs on the server only —
-// DOMPurify and fs access make this module server-bound.
+// sanitize-html and fs access make this module server-bound.
 
 import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtml from "sanitize-html";
 
 const requireFromHere = createRequire(import.meta.url);
 
@@ -31,8 +31,8 @@ function getChartJsSource(): string {
   return chartJsSourceCache;
 }
 
-// Markers that our injected <script> tags carry so DOMPurify's hook can
-// keep them while stripping every other <script>. Two kinds:
+// Markers on our injected <script> tags so downstream code (and humans
+// reading the output) can identify them. Two kinds:
 //   - forge-chartjs-lib: the Chart.js UMD bundle + runtime shim.
 //   - forge-chart-init:  a server-generated per-chart init block (new JSON
 //                        envelope path).
@@ -504,16 +504,11 @@ function buildLegacyChartScriptsHtml(scripts: string[]): string {
 // The result is a full, self-contained HTML document safe to render
 // inside a sandboxed iframe.
 //
-// IMPORTANT: DOMPurify's underlying HTML parser (parse5) mangles
-// <script> bodies that contain `<` operators (e.g. `a<b`, `i<n`) — these
-// appear constantly in minified JS like the Chart.js bundle, and even in
-// our own wrapper's for-loop. The mangling causes the script to be
-// silently dropped, which is why charts looked blank even after the
-// envelope rewrite. Fix: run the USER HTML through DOMPurify with
-// scripts fully disallowed, then inject our trusted scripts (Chart.js
-// library, runtime shim, server-generated or wrapped-legacy chart init)
-// AFTER sanitization. The browser's HTML parser handles `<` in script
-// bodies correctly; only parse5 has the gotcha.
+// We sanitize the USER HTML with scripts fully disallowed, then inject
+// our trusted scripts (Chart.js library, runtime shim, server-generated
+// or wrapped-legacy chart init) AFTER sanitization. Sanitizing first
+// then injecting keeps our known-safe <script> blobs from being mangled
+// or dropped by the sanitizer's parser.
 export function prepareHtmlReport(rawOutput: string): string {
   const envelope = parseReportEnvelope(rawOutput);
 
@@ -536,31 +531,82 @@ export function prepareHtmlReport(rawOutput: string): string {
   // Sanitize only the user-authored HTML. Strip ALL scripts — the ones
   // that carry chart init were pulled out above (legacy) or were never
   // present (new envelope path, which forbids them in the contract).
-  const clean = DOMPurify.sanitize(userHtml, {
-    WHOLE_DOCUMENT: true,
-    ADD_TAGS: ["style"],
-    ADD_ATTR: ["data-forge"],
-    FORBID_TAGS: ["script"],
-    FORBID_ATTR: [
-      "onload",
-      "onerror",
-      "onclick",
-      "onmouseover",
-      "onfocus",
-      "onblur",
-      "onchange",
-      "onsubmit",
-    ],
-  });
+  const clean = sanitizeUserHtml(userHtml);
 
   // Post-sanitization injection. Library + shim go in <head>; init
   // scripts go right before </body> so canvases exist when they run.
   const withLib = injectChartJs(clean);
   const final = injectChartInits(withLib, initScriptsHtml);
 
-  // WHOLE_DOCUMENT strips the doctype. Prepend one so the iframe renders
-  // in standards mode.
+  // Sanitization strips the doctype (it's not a tag). Prepend one so the
+  // iframe renders in standards mode.
   return /^\s*<!doctype/i.test(final) ? final : `<!doctype html>${final}`;
+}
+
+// sanitize-html is allowlist-based, so we pass a broad tag/attribute
+// set that covers what LLMs commonly emit for reports (document shell,
+// semantic HTML, tables, images, canvas for charts, <style>). Scripts
+// and event-handler attributes are stripped by default.
+const REPORT_ALLOWED_TAGS: string[] = [
+  "html", "head", "body", "title", "meta", "link", "style", "base",
+  "div", "span", "p", "br", "hr", "pre", "blockquote",
+  "h1", "h2", "h3", "h4", "h5", "h6",
+  "strong", "b", "em", "i", "u", "s", "small", "sub", "sup",
+  "code", "kbd", "samp", "var", "mark", "del", "ins", "q", "cite", "abbr", "time",
+  "ul", "ol", "li", "dl", "dt", "dd",
+  "a", "img", "figure", "figcaption", "picture", "source",
+  "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "colgroup", "col",
+  "header", "footer", "main", "nav", "section", "article", "aside", "address",
+  "details", "summary",
+  "canvas",
+  "svg", "path", "g", "circle", "rect", "line", "polyline", "polygon", "ellipse", "text", "tspan",
+];
+
+function sanitizeUserHtml(html: string): string {
+  return sanitizeHtml(html, {
+    allowedTags: REPORT_ALLOWED_TAGS,
+    allowedAttributes: {
+      "*": [
+        "id", "class", "style", "data-forge", "lang", "dir", "role", "title",
+        "aria-*",
+      ],
+      a: ["href", "target", "rel", "name"],
+      img: ["src", "alt", "width", "height", "loading", "decoding"],
+      source: ["src", "srcset", "media", "type"],
+      picture: [],
+      canvas: ["width", "height"],
+      meta: ["charset", "name", "content", "http-equiv", "property"],
+      link: ["rel", "href", "type", "media", "sizes"],
+      base: ["href", "target"],
+      table: ["border", "cellpadding", "cellspacing"],
+      td: ["colspan", "rowspan", "align", "valign", "headers"],
+      th: ["colspan", "rowspan", "align", "valign", "scope", "headers"],
+      col: ["span"],
+      colgroup: ["span"],
+      html: ["lang", "dir"],
+      time: ["datetime"],
+      q: ["cite"],
+      blockquote: ["cite"],
+      svg: ["viewBox", "xmlns", "width", "height", "fill", "stroke", "preserveAspectRatio"],
+      path: ["d", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin"],
+      g: ["fill", "stroke", "transform"],
+      circle: ["cx", "cy", "r", "fill", "stroke", "stroke-width"],
+      rect: ["x", "y", "width", "height", "fill", "stroke", "rx", "ry"],
+      line: ["x1", "y1", "x2", "y2", "stroke", "stroke-width"],
+      polyline: ["points", "fill", "stroke", "stroke-width"],
+      polygon: ["points", "fill", "stroke", "stroke-width"],
+      ellipse: ["cx", "cy", "rx", "ry", "fill", "stroke"],
+      text: ["x", "y", "fill", "font-size", "text-anchor"],
+      tspan: ["x", "y", "dx", "dy"],
+    },
+    allowedSchemes: ["http", "https", "mailto", "data", "tel"],
+    allowedSchemesByTag: { img: ["http", "https", "data"] },
+    // <style> is essential for LLM-generated reports and the output
+    // renders in a sandboxed iframe, so CSS-based XSS is contained.
+    allowVulnerableTags: true,
+    // Leave CSS inside <style> untouched (no property filtering).
+    parseStyleAttributes: false,
+  });
 }
 
 // Heuristic: does this output look like an HTML report? Used by pages
