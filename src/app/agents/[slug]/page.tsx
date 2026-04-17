@@ -27,10 +27,14 @@ export default async function AgentDetailPage({
     // seeded directly). Render a read-only view.
     return (
       <main className="relative min-h-screen">
-        <div className="mx-auto max-w-4xl px-6 pt-16">
-          <h1 className="text-2xl font-bold">{lean.apps?.display_name}</h1>
-          <p className="mt-2 text-sm">{lean.description}</p>
-          <p className="mt-6 text-xs text-[color:var(--color-muted-foreground)]">
+        <div className="mx-auto max-w-5xl px-6 pt-20 pb-16">
+          <h1 className="text-3xl font-semibold leading-tight tracking-tight md:text-4xl">
+            {lean.apps?.display_name}
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-[color:var(--color-muted-foreground)]">
+            {lean.description}
+          </p>
+          <p className="mt-6 text-xs leading-relaxed text-[color:var(--color-muted-foreground)]">
             This agent is read-only — no api key in Forge KV.
           </p>
         </div>
@@ -64,27 +68,30 @@ export default async function AgentDetailPage({
 
   return (
     <main className="relative min-h-screen">
-      <div className="mx-auto max-w-5xl px-6 pt-16 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-20 pb-16">
         <Link
           href="/"
-          className="text-sm font-semibold text-[color:var(--color-primary)] hover:underline"
+          className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--color-muted-foreground)] transition-colors duration-200 hover:text-[color:var(--color-primary)]"
         >
-          ← back to Forge
+          ← Back to Forge
         </Link>
-        <header className="mt-4 border-b border-[color:var(--color-border)] pb-6">
+        <header className="mt-4 border-b border-[color:var(--color-border)] pb-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold">{app.display_name}</h1>
-              <p className="mt-2 max-w-2xl text-sm text-[color:var(--color-muted-foreground)]">
+              <div className="mb-3 flex items-center gap-3">
+                <span className="h-px w-8 bg-[color:var(--color-primary)]" />
+                <span className="text-sm font-medium uppercase tracking-wide text-[color:var(--color-primary)]">
+                  Agent
+                </span>
+              </div>
+              <h1 className="text-3xl font-semibold leading-tight tracking-tight md:text-4xl">
+                {app.display_name}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--color-muted-foreground)]">
                 {agent.description}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                 <StatusBadge status={agent.status} />
-                {agent.creator_type === "owner" && (
-                  <span className="rounded-full bg-[#C56A2D] px-2 py-0.5 font-semibold text-white">
-                    Built by Cody
-                  </span>
-                )}
                 {agent.schedule_cadence && (
                   <span className="text-[color:var(--color-muted-foreground)]">
                     {agent.schedule_cadence} @ {formatScheduleTimeCT(agent.schedule_time)}
@@ -117,14 +124,16 @@ export default async function AgentDetailPage({
           </div>
         </header>
 
-        <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-[1fr_240px]">
-          <div className="space-y-8">
+        <div className="mt-10 grid grid-cols-1 gap-10 md:grid-cols-[1fr_240px]">
+          <div className="space-y-10">
             <section>
-              <h2 className="text-lg font-bold">Latest Run</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide">
+                Latest Run
+              </h2>
               {latest ? (
                 <Link
                   href={`/agents/${slug}/runs/${latest.id}`}
-                  className="card mt-3 block p-4 hover:shadow-md"
+                  className="card block p-5 transition-all duration-200 hover:bg-[#E4D8C5] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)]"
                 >
                   <div className="flex items-center justify-between">
                     <RunStatusBadge status={latest.status} />
@@ -132,31 +141,33 @@ export default async function AgentDetailPage({
                       {relativeTime(latest.created_at)}
                     </span>
                   </div>
-                  <div className="mt-2 flex gap-4 text-xs text-[color:var(--color-muted-foreground)]">
+                  <div className="mt-3 flex gap-4 text-xs text-[color:var(--color-muted-foreground)]">
                     <span>{formatDuration(latest.duration_ms)}</span>
                     <span>{formatCost(latest.cost_usd)}</span>
                   </div>
                 </Link>
               ) : (
-                <p className="mt-3 text-sm text-[color:var(--color-muted-foreground)]">
+                <p className="text-sm leading-relaxed text-[color:var(--color-muted-foreground)]">
                   No runs yet.
                 </p>
               )}
             </section>
 
             <section>
-              <h2 className="text-lg font-bold">Run History</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide">
+                Run History
+              </h2>
               {runs.length === 0 ? (
-                <p className="mt-3 text-sm text-[color:var(--color-muted-foreground)]">
+                <p className="text-sm leading-relaxed text-[color:var(--color-muted-foreground)]">
                   No history yet.
                 </p>
               ) : (
-                <ul className="mt-3 divide-y divide-[color:var(--color-border)] rounded-md border border-[color:var(--color-border)]">
+                <ul className="divide-y divide-[color:var(--color-border)]/60 overflow-hidden rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-card)]">
                   {runs.map((r) => (
                     <li key={r.id}>
                       <Link
                         href={`/agents/${slug}/runs/${r.id}`}
-                        className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-4 py-3 text-sm hover:bg-[color:var(--color-card)]"
+                        className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#E4D8C5]"
                       >
                         <RunStatusBadge status={r.status} />
                         <span className="text-[color:var(--color-muted-foreground)]">
@@ -176,7 +187,7 @@ export default async function AgentDetailPage({
             </section>
           </div>
 
-          <aside className="card h-fit space-y-2 p-4 text-xs">
+          <aside className="card h-fit space-y-2 p-5 text-xs leading-relaxed">
             <Row label="Model" value={agent.model ?? "—"} />
             <Row label="Input" value={
               (() => {

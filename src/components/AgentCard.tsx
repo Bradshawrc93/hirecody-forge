@@ -19,23 +19,18 @@ export function AgentCard({ agent }: { agent: AgentRecord }) {
   return (
     <Link
       href={`/agents/${slug}`}
-      className={`card block p-5 transition-all hover:-translate-y-0.5 hover:shadow-md animate-fadein ${
+      className={`card animate-fadein block p-5 transition-all duration-200 hover:bg-[#E4D8C5] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)] ${
         isPulsing ? "animate-pulse-bar" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-lg font-semibold leading-tight">{display}</h3>
+        <h3 className="text-sm font-semibold leading-snug">{display}</h3>
         <StatusBadge status={agent.status} />
       </div>
-      <p className="mt-2 text-sm text-[color:var(--color-muted-foreground)]">
+      <p className="mt-2 text-sm leading-relaxed text-[color:var(--color-muted-foreground)]">
         {truncate(agent.description, 110)}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--color-muted-foreground)]">
-        {agent.creator_type === "owner" && (
-          <span className="rounded-full bg-[#C56A2D] px-2 py-0.5 font-semibold text-white">
-            Built by Cody
-          </span>
-        )}
         {agent.schedule_cadence && (
           <span className="inline-flex items-center gap-1">
             <Calendar size={12} /> {agent.schedule_cadence}
@@ -48,7 +43,7 @@ export function AgentCard({ agent }: { agent: AgentRecord }) {
         )}
       </div>
       {lastRunStrip && !isPulsing && (
-        <div className="mt-4 border-t border-[color:var(--color-border)] pt-3 text-xs text-[color:var(--color-muted-foreground)]">
+        <div className="mt-1 border-t border-[color:var(--color-border)]/60 pt-3 text-xs text-[color:var(--color-muted-foreground)]">
           {lastRunStrip}
         </div>
       )}

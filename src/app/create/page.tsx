@@ -88,14 +88,24 @@ export default function CreatePage() {
 
   return (
     <main className="relative min-h-screen">
-      <div className="mx-auto max-w-2xl px-4 pt-16 pb-12">
+      <div className="mx-auto max-w-2xl px-6 pt-20 pb-16">
         <div className="card relative p-6 md:p-8">
           <div className="mb-6 space-y-4">
             <div className="flex items-center justify-between gap-3">
-              <h1 className="text-xl font-bold">Create Agent</h1>
+              <div>
+                <div className="mb-2 flex items-center gap-3">
+                  <span className="h-px w-8 bg-[color:var(--color-primary)]" />
+                  <span className="text-sm font-medium uppercase tracking-wide text-[color:var(--color-primary)]">
+                    New
+                  </span>
+                </div>
+                <h1 className="text-3xl font-semibold leading-tight tracking-tight md:text-4xl">
+                  Create Agent
+                </h1>
+              </div>
               <button
                 type="button"
-                className="rounded-md border border-[#C56A2D] bg-transparent px-3 py-1.5 text-sm font-semibold text-[#C56A2D] transition-colors hover:bg-[#C56A2D] hover:text-white"
+                className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] transition-colors duration-200 hover:bg-[color:var(--color-card)]"
                 onClick={handleCancel}
               >
                 Cancel

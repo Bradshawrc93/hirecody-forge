@@ -45,19 +45,19 @@ export default async function ReportViewerPage({
 
   return (
     <main className="flex h-screen flex-col bg-[color:var(--color-background)]">
-      <header className="flex items-center justify-between border-b border-[color:var(--color-border)] bg-[color:var(--color-card)] px-4 py-2 text-sm">
+      <header className="flex items-center justify-between border-b border-[color:var(--color-border)] bg-[color:var(--color-card)] px-6 py-3 text-sm">
         <Link
           href={`/agents/${slug}/runs/${run_id}`}
-          className="font-semibold text-[color:var(--color-primary)] hover:underline"
+          className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--color-muted-foreground)] transition-colors duration-200 hover:text-[color:var(--color-primary)]"
         >
-          ← Back to run
+          ← Back to Run
         </Link>
-        <span className="truncate text-xs text-[color:var(--color-muted-foreground)]">
+        <span className="truncate text-xs uppercase tracking-[0.2em] text-[color:var(--color-muted-foreground)]">
           {agentName} — Report
         </span>
         <Link
           href="/"
-          className="text-xs font-semibold text-[color:var(--color-primary)] hover:underline"
+          className="text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--color-muted-foreground)] transition-colors duration-200 hover:text-[color:var(--color-primary)]"
         >
           Forge
         </Link>
