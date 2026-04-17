@@ -3,6 +3,10 @@
     {
       "path": "/api/internal/dispatch",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/internal/sweep",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
