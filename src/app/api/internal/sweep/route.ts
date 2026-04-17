@@ -16,10 +16,13 @@ interface SweptEntry {
 }
 
 export async function GET(req: Request) {
-  const isVercelCron = req.headers.get("x-vercel-cron") === "1";
-  const secret = process.env.FORGE_CRON_SECRET;
+  const cronSecret = process.env.CRON_SECRET;
+  const auth = req.headers.get("authorization");
+  const isVercelCron = !!cronSecret && auth === `Bearer ${cronSecret}`;
+  const forgeSecret = process.env.FORGE_CRON_SECRET;
   const provided = req.headers.get("x-cron-key");
-  if (!isVercelCron && (!secret || provided !== secret)) {
+  const isManual = !!forgeSecret && provided === forgeSecret;
+  if (!isVercelCron && !isManual) {
     return NextResponse.json({ error: "unauthorized" }, { status: 403 });
   }
 

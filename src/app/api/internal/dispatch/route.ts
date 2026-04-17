@@ -10,12 +10,15 @@ export const maxDuration = 300;
 // runs for KV-known agents and execute them serially. Bail before the
 // 60-second function limit; remaining runs get picked up next tick.
 export async function GET(req: Request) {
-  // Auth: Vercel sets `x-vercel-cron: 1` for cron-triggered requests.
-  // For local manual runs we also accept FORGE_CRON_SECRET via header.
-  const isVercelCron = req.headers.get("x-vercel-cron") === "1";
-  const secret = process.env.FORGE_CRON_SECRET;
+  // Auth: Vercel cron sends `Authorization: Bearer ${CRON_SECRET}`.
+  // For local/manual triggers we also accept FORGE_CRON_SECRET via x-cron-key.
+  const cronSecret = process.env.CRON_SECRET;
+  const auth = req.headers.get("authorization");
+  const isVercelCron = !!cronSecret && auth === `Bearer ${cronSecret}`;
+  const forgeSecret = process.env.FORGE_CRON_SECRET;
   const provided = req.headers.get("x-cron-key");
-  if (!isVercelCron && (!secret || provided !== secret)) {
+  const isManual = !!forgeSecret && provided === forgeSecret;
+  if (!isVercelCron && !isManual) {
     return NextResponse.json({ error: "unauthorized" }, { status: 403 });
   }
 
