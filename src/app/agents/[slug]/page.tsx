@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AgentActions } from "@/components/AgentActions";
 import { StatusBadge, RunStatusBadge } from "@/components/StatusBadge";
+import { RunFeedback } from "@/components/RunFeedback";
 import { findAgentBySlug } from "@/lib/agent-lookup";
 import { getAgent, listAgentRuns } from "@/lib/obs";
 import { getAgentKey } from "@/lib/kv";
@@ -131,21 +132,32 @@ export default async function AgentDetailPage({
                 Latest Run
               </h2>
               {latest ? (
-                <Link
-                  href={`/agents/${slug}/runs/${latest.id}`}
-                  className="card block p-5 transition-all duration-200 hover:bg-[#E4D8C5] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)]"
-                >
-                  <div className="flex items-center justify-between">
+                <div className="card relative p-5 transition-all duration-200 hover:bg-[#E4D8C5] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)]">
+                  <Link
+                    href={`/agents/${slug}/runs/${latest.id}`}
+                    aria-label="Open latest run"
+                    className="absolute inset-0 rounded-[inherit]"
+                  />
+                  <div className="relative flex items-center justify-between">
                     <RunStatusBadge status={latest.status} />
                     <span className="text-xs text-[color:var(--color-muted-foreground)]">
                       {relativeTime(latest.created_at)}
                     </span>
                   </div>
-                  <div className="mt-3 flex gap-4 text-xs text-[color:var(--color-muted-foreground)]">
-                    <span>{formatDuration(latest.duration_ms)}</span>
-                    <span>{formatCost(latest.cost_usd)}</span>
+                  <div className="relative mt-3 flex items-center justify-between gap-4 text-xs text-[color:var(--color-muted-foreground)]">
+                    <div className="flex gap-4">
+                      <span>{formatDuration(latest.duration_ms)}</span>
+                      <span>{formatCost(latest.cost_usd)}</span>
+                    </div>
+                    {latest.status === "completed" && (
+                      <RunFeedback
+                        appId={app.id}
+                        runId={latest.id}
+                        initialVote={latest.user_rating ?? null}
+                      />
+                    )}
                   </div>
-                </Link>
+                </div>
               ) : (
                 <p className="text-sm leading-relaxed text-[color:var(--color-muted-foreground)]">
                   No runs yet.
