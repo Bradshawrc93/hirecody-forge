@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Server } from "lucide-react";
 import { listAgents, type AgentRecord } from "@/lib/obs";
 import { AgentCard } from "@/components/AgentCard";
 import { BackButton } from "@/components/BackButton";
@@ -42,13 +43,22 @@ export default async function HomePage() {
           A playground for building and running custom agents. Build one, watch
           it work, see the telemetry.
         </p>
-        <div className="mt-6">
+        <div className="mt-6 flex flex-wrap items-center gap-3">
           <Link
             href="/create"
             className="inline-flex items-center gap-2 rounded-lg bg-[color:var(--color-primary)] px-4 py-2 text-sm font-medium text-[color:var(--color-primary-foreground)] transition-colors duration-200 hover:bg-[#a85a24]"
           >
             Create Agent
           </Link>
+          <a
+            href="https://obs.hirecody.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-transparent px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] transition-colors duration-200 hover:bg-[color:var(--color-muted)]"
+          >
+            <Server size={16} className="shrink-0" />
+            Obs
+          </a>
         </div>
       </section>
 
