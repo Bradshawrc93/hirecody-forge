@@ -52,8 +52,6 @@ export default async function HomePage() {
           </Link>
           <a
             href="https://obs.hirecody.dev"
-            target="_blank"
-            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-transparent px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] transition-colors duration-200 hover:bg-[color:var(--color-muted)]"
           >
             <Server size={16} className="shrink-0" />
