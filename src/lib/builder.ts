@@ -17,6 +17,18 @@ export interface BuilderInput {
   verified_email?: string | null;
   user_feedback?: string | null;
   previous_plan?: AgentPlan | null;
+  previous_run_status?: "completed" | "failed" | null;
+  previous_run_output?: string | null;
+  previous_run_error?: string | null;
+}
+
+// Keep prior-run excerpts short so the builder prompt stays focused.
+function truncateForPrompt(s: string | null | undefined, max = 1500): string | null {
+  if (!s) return null;
+  const trimmed = s.trim();
+  if (!trimmed) return null;
+  if (trimmed.length <= max) return trimmed;
+  return trimmed.slice(0, max) + `\n…[truncated ${trimmed.length - max} chars]`;
 }
 
 const SYSTEM = `You are an agent designer for a lightweight automation platform. Given a user's plain-English description plus a structured form, produce a JSON "plan" that the execution engine will run.
@@ -203,7 +215,32 @@ export async function buildAgentPlan(input: BuilderInput): Promise<{
     user_feedback: input.user_feedback ?? null,
   };
 
-  const userMessage = input.user_feedback
+  const isRebuild =
+    !!input.user_feedback ||
+    !!input.previous_plan ||
+    !!input.previous_run_status;
+
+  const feedbackText = input.user_feedback?.trim()
+    ? input.user_feedback.trim()
+    : "(The user did not provide written feedback — diagnose from the previous run's output/error below.)";
+
+  const prevOutput = truncateForPrompt(input.previous_run_output);
+  const prevError = truncateForPrompt(input.previous_run_error);
+
+  let previousRunBlock = "";
+  if (input.previous_run_status) {
+    previousRunBlock =
+      `\n\nPrevious test run status: ${input.previous_run_status}.` +
+      (prevError
+        ? `\n\nError message from the previous run:\n\n"""\n${prevError}\n"""`
+        : "") +
+      (prevOutput
+        ? `\n\nOutput produced by the previous run (may be empty, wrong-region, or malformed — this is the evidence of what went wrong):\n\n"""\n${prevOutput}\n"""`
+        : "") +
+      `\n\nWhen revising the plan, directly address whatever caused this failure or bad output. Common root causes: a web_fetch URL that 403s or returns the wrong data, a prompt that does not constrain the LLM enough, a missing dedupe/filter step, or an input the prompt did not reference. Pick different URLs, tighten prompts, or restructure steps as needed — do not simply re-emit the previous plan.`;
+  }
+
+  const userMessage = isRebuild
     ? `This is a REBUILD attempt. The previous build did not meet the user's expectations.${
         input.previous_plan
           ? `\n\nHere is the exact plan you generated previously (so you can see what to change):\n\n\`\`\`json\n${JSON.stringify(
@@ -212,7 +249,7 @@ export async function buildAgentPlan(input: BuilderInput): Promise<{
               2
             )}\n\`\`\``
           : ""
-      }\n\nThe user's feedback on what was wrong:\n\n"""\n${input.user_feedback}\n"""\n\nGenerate a revised plan that directly addresses this feedback. Do not simply repeat the previous plan.\n\nOriginal request:\n\n${JSON.stringify(
+      }${previousRunBlock}\n\nThe user's feedback on what was wrong:\n\n"""\n${feedbackText}\n"""\n\nGenerate a revised plan that directly addresses the feedback and the prior failure. Do not simply repeat the previous plan.\n\nOriginal request:\n\n${JSON.stringify(
         userPayload,
         null,
         2

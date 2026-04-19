@@ -6,9 +6,16 @@ import { BUILDER_MODEL } from "@/lib/anthropic";
 import { isAgentPlan, type AgentPlan } from "@/lib/agent-plan";
 import { legacyInputTypeToConfig, normalizeInputConfig } from "@/components/CreateFlow/types";
 
+interface PreviousRun {
+  status: "completed" | "failed";
+  output: string | null;
+  error_message: string | null;
+}
+
 interface RequestBody {
   app_id: string;
   user_feedback: string;
+  previous_run?: PreviousRun | null;
 }
 
 export async function POST(req: Request) {
@@ -19,9 +26,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  if (!body.app_id || !body.user_feedback) {
+  if (!body.app_id) {
+    return NextResponse.json({ error: "missing app_id" }, { status: 400 });
+  }
+  // Allow empty user_feedback when we have previous_run context — the
+  // error/output alone is enough signal for the builder to retry.
+  const hasFeedback = !!body.user_feedback && body.user_feedback.trim().length > 0;
+  const hasPrevRun =
+    !!body.previous_run &&
+    (body.previous_run.error_message != null ||
+      body.previous_run.output != null);
+  if (!hasFeedback && !hasPrevRun) {
     return NextResponse.json(
-      { error: "missing app_id or user_feedback" },
+      { error: "missing user_feedback or previous_run context" },
       { status: 400 }
     );
   }
@@ -70,6 +87,9 @@ export async function POST(req: Request) {
       verified_email: agent.verified_email ?? null,
       user_feedback: body.user_feedback,
       previous_plan: previousPlan,
+      previous_run_status: body.previous_run?.status ?? null,
+      previous_run_output: body.previous_run?.output ?? null,
+      previous_run_error: body.previous_run?.error_message ?? null,
     });
   } catch (e) {
     await postBuild(body.app_id, apiKey, {

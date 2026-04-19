@@ -37,13 +37,19 @@ function readFileAsText(file: File): Promise<string> {
   });
 }
 
+export interface PreviousRunContext {
+  status: "completed" | "failed";
+  output: string | null;
+  error_message: string | null;
+}
+
 interface Props {
   appId: string;
   slug: string;
   form: FormState;
   attemptNumber: 1 | 2;
   onLive: () => void;
-  onRebuild: (feedback: string) => void;
+  onRebuild: (feedback: string, previousRun: PreviousRunContext | null) => void;
   onAbandon: () => void;
 }
 
@@ -66,6 +72,7 @@ export function Step5Test({
   );
   const [terminal, setTerminal] = useState<"completed" | "failed" | null>(null);
   const [output, setOutput] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [thumbsDown, setThumbsDown] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [showTooComplex, setShowTooComplex] = useState(false);
@@ -136,7 +143,8 @@ export function Step5Test({
         const res = await fetch(`/api/internal/run-status?app_id=${appId}&run_id=${runId}`);
         if (res.ok) {
           const data = await res.json();
-          setOutput(data.output ?? data.error_message ?? "");
+          setOutput(data.output ?? null);
+          setErrorMessage(data.error_message ?? null);
         }
       })();
     }
@@ -186,7 +194,10 @@ export function Step5Test({
         feedback,
       }),
     });
-    onRebuild(feedback);
+    const previousRun: PreviousRunContext | null = terminal
+      ? { status: terminal, output, error_message: errorMessage }
+      : null;
+    onRebuild(feedback, previousRun);
   }
 
   async function acknowledgeTooComplex() {
@@ -313,7 +324,7 @@ export function Step5Test({
             {terminal === "completed" ? "Output" : "Error"}
           </h4>
           <div className="mt-2 max-h-64 overflow-auto">
-            {output == null ? (
+            {terminal === "completed" && output == null ? (
               <p className="text-sm text-[color:var(--color-muted-foreground)]">
                 (loading…)
               </p>
@@ -340,10 +351,12 @@ export function Step5Test({
                     </a>
                   );
                 }
-                return <MarkdownView content={output} />;
+                return <MarkdownView content={output ?? ""} />;
               })()
             ) : (
-              <pre className="whitespace-pre-wrap text-sm">{output}</pre>
+              <pre className="whitespace-pre-wrap text-sm">
+                {errorMessage ?? output ?? "(loading…)"}
+              </pre>
             )}
           </div>
         </div>

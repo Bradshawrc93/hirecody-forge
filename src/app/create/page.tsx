@@ -7,7 +7,7 @@ import { Step1Describe } from "@/components/CreateFlow/Step1Describe";
 import { Step2Capabilities } from "@/components/CreateFlow/Step2Capabilities";
 import { Step3Success } from "@/components/CreateFlow/Step3Success";
 import { Step4Build } from "@/components/CreateFlow/Step4Build";
-import { Step5Test } from "@/components/CreateFlow/Step5Test";
+import { Step5Test, type PreviousRunContext } from "@/components/CreateFlow/Step5Test";
 import { DEFAULT_FORM, type FormState } from "@/components/CreateFlow/types";
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -18,6 +18,7 @@ export default function CreatePage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [created, setCreated] = useState<{ app_id: string; slug: string } | null>(null);
   const [pendingFeedback, setPendingFeedback] = useState<string | null>(null);
+  const [pendingPreviousRun, setPendingPreviousRun] = useState<PreviousRunContext | null>(null);
   const [buildAttempt, setBuildAttempt] = useState(0);
   const [attemptNumber, setAttemptNumber] = useState<1 | 2>(1);
   const buildPromiseRef = useRef<Promise<{ app_id: string; slug: string } | null> | null>(null);
@@ -58,12 +59,16 @@ export default function CreatePage() {
     await deleteAgentById(created.app_id);
   }
 
-  async function handleRebuild(feedback: string) {
+  async function handleRebuild(
+    feedback: string,
+    previousRun: PreviousRunContext | null
+  ) {
     if (!created) return;
     // In-place rebuild: keep the same app_id/slug. Step4Build will hit
     // the rebuild endpoint, which patches the existing agent's config
     // and posts a new build record as attempt_number 2.
     setPendingFeedback(feedback);
+    setPendingPreviousRun(previousRun);
     setAttemptNumber(2);
     setBuildAttempt((n) => n + 1);
     setStep(4);
@@ -142,6 +147,7 @@ export default function CreatePage() {
               key={buildAttempt}
               form={form}
               userFeedback={pendingFeedback}
+              previousRun={pendingPreviousRun}
               mode={attemptNumber === 2 ? "rebuild" : "initial"}
               appId={created?.app_id ?? null}
               onBuildStarted={(p) => {

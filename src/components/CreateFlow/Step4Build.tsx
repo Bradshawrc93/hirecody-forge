@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FormState } from "./types";
+import type { PreviousRunContext } from "./Step5Test";
 
 interface Props {
   form: FormState;
   userFeedback?: string | null;
+  previousRun?: PreviousRunContext | null;
   onSuccess: (result: { app_id: string; slug: string }) => void;
   onRetry: () => void;
   onBuildStarted?: (
@@ -69,6 +71,7 @@ const PULSE_PHRASES = [
 export function Step4Build({
   form,
   userFeedback,
+  previousRun,
   onSuccess,
   onRetry,
   onBuildStarted,
@@ -113,7 +116,11 @@ export function Step4Build({
             : "/api/internal/build-agent";
         const payload =
           mode === "rebuild"
-            ? { app_id: appId, user_feedback: userFeedback ?? "" }
+            ? {
+                app_id: appId,
+                user_feedback: userFeedback ?? "",
+                previous_run: previousRun ?? null,
+              }
             : { ...form, user_feedback: userFeedback ?? null };
         const res = await fetch(endpoint, {
           method: "POST",
