@@ -19,6 +19,13 @@ export type PlanStep =
       output_var?: string;
     }
   | {
+      type: "web_search";
+      name: string;
+      query: string;
+      max_results?: number;
+      output_var?: string;
+    }
+  | {
       type: "file_read";
       name: string;
       output_var?: string;

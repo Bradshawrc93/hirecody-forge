@@ -176,6 +176,20 @@ function StepDetail({ group }: { group: GroupedStep }) {
         </>
       )}
 
+      {service === "web_search" && (
+        <>
+          {typeof meta.query === "string" && (
+            <DetailRow label="Query" value={meta.query} wrap />
+          )}
+          {typeof meta.max_results === "number" && (
+            <DetailRow label="Results" value={String(meta.max_results)} />
+          )}
+          {typeof meta.output_preview === "string" && (
+            <DetailBlock label="Results" text={meta.output_preview} />
+          )}
+        </>
+      )}
+
       {service === "email" && (
         <>
           {meta.to != null && (

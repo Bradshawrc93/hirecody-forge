@@ -35,7 +35,8 @@ const SYSTEM = `You are an agent designer for a lightweight automation platform.
 
 The plan must use ONLY these step types:
 - "llm": calls an LLM. Fields: name, prompt, optional output_var, optional max_tokens (default 1024).
-- "web_fetch": HTTP GET to a public URL. Fields: name, url, optional output_var. Only allowed when has_web_access is true.
+- "web_search": searches the live web via Firecrawl and returns the top results as markdown (title, URL, snippet, and the scraped page content). Fields: name, query, optional max_results (1-10, default 5), optional output_var. Only allowed when has_web_access is true. PREFER this over web_fetch for ANY discovery task — "find X near me", "latest news about Y", "best Z for W" — because it handles anti-bot protection, returns clean markdown, and surfaces multiple sources in one call.
+- "web_fetch": HTTP GET to a specific public URL you already know. Fields: name, url, optional output_var. Only allowed when has_web_access is true. Use this ONLY when the user gives you a specific URL, an RSS feed, or a well-known static endpoint. For anything that requires finding pages first, use web_search instead — web_search already scrapes the result pages, so you rarely need a separate web_fetch after it.
 - "file_read": reads the user-provided input file(s). Fields: name, optional output_var. Only allowed when input_config.file.enabled is true. When multiple file slots are configured the combined, labeled contents are returned (also available directly as {{file_1}}, {{file_2}}, ...).
 - "email": sends an email to the verified address. Fields: name, subject_template, body_template. Only allowed when can_send_email is true. The subject_template MUST be a short one-line string (under ~80 chars) — typically a literal title, optionally with {{input_text}} or a short variable. NEVER reference the long body/output variable in subject_template: email providers reject subjects containing newlines.
 - "output": final markdown rendered for the user. Fields: name, template. Use this for standard text/markdown output.
@@ -237,7 +238,7 @@ export async function buildAgentPlan(input: BuilderInput): Promise<{
       (prevOutput
         ? `\n\nOutput produced by the previous run (may be empty, wrong-region, or malformed — this is the evidence of what went wrong):\n\n"""\n${prevOutput}\n"""`
         : "") +
-      `\n\nWhen revising the plan, directly address whatever caused this failure or bad output. Common root causes: a web_fetch URL that 403s or returns the wrong data, a prompt that does not constrain the LLM enough, a missing dedupe/filter step, or an input the prompt did not reference. Pick different URLs, tighten prompts, or restructure steps as needed — do not simply re-emit the previous plan.`;
+      `\n\nWhen revising the plan, directly address whatever caused this failure or bad output. Common root causes: a web_fetch URL that 403s or returns the wrong data (switch to web_search for discovery tasks — it handles anti-bot and returns multiple sources), a prompt that does not constrain the LLM enough, a missing dedupe/filter step, or an input the prompt did not reference. Pick different URLs, swap web_fetch for web_search, tighten prompts, or restructure steps as needed — do not simply re-emit the previous plan.`;
   }
 
   const userMessage = isRebuild

@@ -11,6 +11,7 @@ import {
 import type { AgentPlan, PlanStep } from "./agent-plan";
 import { prepareHtmlReport } from "./html-report";
 import { buildCsvEnvelope, CSV_ROW_LIMIT } from "./csv-report";
+import { firecrawlScrape, firecrawlSearch, hasFirecrawl } from "./firecrawl";
 
 // Tiny templating: replace {{var}} with the variable bag.
 function render(template: string, vars: Record<string, string>): string {
@@ -152,18 +153,59 @@ async function runLLMStep(
   return { text, inputTokens, outputTokens, costUsd };
 }
 
+// Truncate long web content so it fits comfortably in an LLM prompt.
+function truncateWebContent(text: string): string {
+  return text.length > 50000 ? text.slice(0, 50000) + "\n…[truncated]" : text;
+}
+
 async function runWebFetchStep(
   step: Extract<PlanStep, { type: "web_fetch" }>,
   vars: Record<string, string>
 ): Promise<string> {
   const url = render(step.url, vars);
+
+  // Prefer Firecrawl scrape when configured: returns clean markdown and
+  // bypasses the anti-bot 403s that killed direct-fetch attempts. Fall
+  // back to native fetch only when Firecrawl isn't configured.
+  if (hasFirecrawl()) {
+    const md = await firecrawlScrape(url);
+    return truncateWebContent(md);
+  }
+
   const res = await fetch(url, {
-    headers: { "user-agent": "hirecody-forge/1.0" },
+    headers: {
+      "user-agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+    },
     signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) throw new Error(`web_fetch ${url} → HTTP ${res.status}`);
-  const text = await res.text();
-  return text.length > 50000 ? text.slice(0, 50000) + "\n…[truncated]" : text;
+  return truncateWebContent(await res.text());
+}
+
+async function runWebSearchStep(
+  step: Extract<PlanStep, { type: "web_search" }>,
+  vars: Record<string, string>
+): Promise<string> {
+  if (!hasFirecrawl()) {
+    throw new Error(
+      "web_search requires FIRECRAWL_API to be configured on the server"
+    );
+  }
+  const query = render(step.query, vars);
+  const limit = step.max_results ?? 5;
+  const results = await firecrawlSearch(query, limit);
+  if (results.length === 0) {
+    return `No results for query: ${query}`;
+  }
+  // Render as a markdown-ish bundle the LLM can consume directly.
+  const blocks = results.map((r, i) => {
+    const header = `## Result ${i + 1}: ${r.title ?? r.url}\nURL: ${r.url}`;
+    const snippet = r.description ? `\n\n${r.description}` : "";
+    const body = r.markdown ? `\n\n${r.markdown}` : "";
+    return `${header}${snippet}${body}`;
+  });
+  return truncateWebContent(blocks.join("\n\n---\n\n"));
 }
 
 // Derive the app's public base URL for building the email's report link.
@@ -262,6 +304,10 @@ export async function executeAgent(
       } else if (step.type === "web_fetch") {
         startMeta.url = render(step.url, vars);
         if (step.output_var) startMeta.output_var = step.output_var;
+      } else if (step.type === "web_search") {
+        startMeta.query = render(step.query, vars);
+        startMeta.max_results = step.max_results ?? 5;
+        if (step.output_var) startMeta.output_var = step.output_var;
       } else if (step.type === "email") {
         startMeta.to = verifiedEmail ?? null;
         startMeta.subject_preview = render(step.subject_template, vars).slice(0, 200);
@@ -299,6 +345,9 @@ export async function executeAgent(
           if (step.output_var) vars[step.output_var] = r.text;
         } else if (step.type === "web_fetch") {
           producedOutput = await runWebFetchStep(step, vars);
+          if (step.output_var) vars[step.output_var] = producedOutput;
+        } else if (step.type === "web_search") {
+          producedOutput = await runWebSearchStep(step, vars);
           if (step.output_var) vars[step.output_var] = producedOutput;
         } else if (step.type === "file_read") {
           // Concatenate all files with clear labels so the LLM sees each
@@ -397,6 +446,9 @@ export async function executeAgent(
           completeMeta.model = plan.model;
         } else if (step.type === "web_fetch") {
           completeMeta.url = render(step.url, vars);
+        } else if (step.type === "web_search") {
+          completeMeta.query = render(step.query, vars);
+          completeMeta.max_results = step.max_results ?? 5;
         } else if (step.type === "html_report") {
           completeMeta.output_type = "html_report";
         } else if (step.type === "csv_report") {
