@@ -19,7 +19,7 @@ export function AgentCard({ agent }: { agent: AgentRecord }) {
   return (
     <Link
       href={`/agents/${slug}`}
-      className={`card animate-fadein block p-5 transition-all duration-200 hover:bg-[#E4D8C5] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)] ${
+      className={`card animate-fadein block p-5 transition-all duration-200 hover:bg-[#C2D6C9] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)] ${
         isPulsing ? "animate-pulse-bar" : ""
       }`}
     >

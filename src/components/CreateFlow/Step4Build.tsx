@@ -174,7 +174,7 @@ export function Step4Build({
         still working · {elapsed}s elapsed
       </p>
       {slow && !veryLong && (
-        <p className="text-xs text-[#C56A2D]">
+        <p className="text-xs text-[color:var(--color-primary)]">
           Taking longer than usual — still connected, hang tight.
         </p>
       )}

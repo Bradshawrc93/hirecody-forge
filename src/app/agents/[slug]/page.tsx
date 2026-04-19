@@ -132,7 +132,7 @@ export default async function AgentDetailPage({
                 Latest Run
               </h2>
               {latest ? (
-                <div className="card relative p-5 transition-all duration-200 hover:bg-[#E4D8C5] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)]">
+                <div className="card relative p-5 transition-all duration-200 hover:bg-[#C2D6C9] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)]">
                   <Link
                     href={`/agents/${slug}/runs/${latest.id}`}
                     aria-label="Open latest run"
@@ -179,7 +179,7 @@ export default async function AgentDetailPage({
                     <li key={r.id}>
                       <Link
                         href={`/agents/${slug}/runs/${r.id}`}
-                        className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#E4D8C5]"
+                        className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#C2D6C9]"
                       >
                         <RunStatusBadge status={r.status} />
                         <span className="text-[color:var(--color-muted-foreground)]">

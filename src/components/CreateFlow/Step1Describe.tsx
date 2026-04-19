@@ -108,7 +108,7 @@ export function Step1Describe({ form, setForm, onNext }: Props) {
                 guardrail.feasibility === "simple"
                   ? "font-semibold text-[#4F8A4F]"
                   : guardrail.feasibility === "moderate"
-                  ? "font-semibold text-[#C56A2D]"
+                  ? "font-semibold text-[color:var(--color-primary)]"
                   : "font-semibold text-[#B3413A]"
               }
             >

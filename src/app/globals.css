@@ -1,16 +1,24 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-background: #faf7f2;
-  --color-foreground: #2b2b2b;
-  --color-card: #f1e9dd;
-  --color-border: #e5ddd0;
-  --color-input: #e5ddd0;
-  --color-primary: #c56a2d;
-  --color-primary-foreground: #faf7f2;
-  --color-accent: #c56a2d;
-  --color-ring: #c56a2d;
-  --color-muted-foreground: #6b6b6b;
+  --color-background: #f1f6f2;
+  --color-foreground: #15302a;
+  --color-card: #dcebe2;
+  --color-card-foreground: #15302a;
+  --color-popover: #f1f6f2;
+  --color-popover-foreground: #15302a;
+  --color-secondary: #dcebe2;
+  --color-secondary-foreground: #15302a;
+  --color-muted: #e5efe8;
+  --color-muted-foreground: #4f6b5f;
+  --color-border: #c8dcd0;
+  --color-input: #c8dcd0;
+  --color-primary: #2e7d5b;
+  --color-primary-foreground: #f1f6f2;
+  --color-accent: #2e7d5b;
+  --color-accent-foreground: #f1f6f2;
+  --color-ring: #2e7d5b;
+  --color-panel: #d2e2d7;
   --color-success: #4f8a4f;
   --color-danger: #b3413a;
   --radius: 0.75rem;
@@ -88,7 +96,7 @@ body {
   transition: background-color 0.2s;
 }
 .btn-primary:hover {
-  background: #a85a24;
+  background: #24624a;
 }
 .btn-primary:disabled {
   opacity: 0.55;
@@ -143,7 +151,7 @@ body {
 }
 .input:focus {
   border-color: var(--color-ring);
-  box-shadow: 0 0 0 3px rgba(197, 106, 45, 0.18);
+  box-shadow: 0 0 0 3px rgba(46, 125, 91, 0.18);
 }
 
 .label {

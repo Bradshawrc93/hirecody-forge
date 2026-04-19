@@ -11,9 +11,9 @@ export function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 | 5 }) {
             <div
               className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
                 active
-                  ? "bg-[#C56A2D] text-white"
+                  ? "bg-[color:var(--color-primary)] text-[color:var(--color-primary-foreground)]"
                   : done
-                  ? "bg-[#C56A2D]/30 text-[#7A3F12]"
+                  ? "bg-[color:var(--color-primary)]/30 text-[color:var(--color-foreground)]"
                   : "bg-[color:var(--color-card)] text-[color:var(--color-muted-foreground)]"
               }`}
             >

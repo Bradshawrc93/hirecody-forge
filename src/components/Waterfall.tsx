@@ -82,12 +82,12 @@ export function Waterfall({ appId, runId, onTerminal, truncateNames = false }: P
                 ? "border-[#B3413A]"
                 : g.state === "complete"
                 ? "border-[#4F8A4F]"
-                : "border-[#C56A2D]";
+                : "border-[color:var(--color-primary)]";
             return (
               <li
                 key={g.name + g.startSeq}
                 className={`animate-fadein cursor-pointer rounded-md border-l-4 bg-[color:var(--color-background)] px-3 py-2 ${stateColor} ${
-                  selectedName === g.name ? "ring-2 ring-[#C56A2D]" : ""
+                  selectedName === g.name ? "ring-2 ring-[color:var(--color-primary)]" : ""
                 }`}
                 onClick={() => setSelectedName(g.name)}
               >

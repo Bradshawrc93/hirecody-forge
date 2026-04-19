@@ -46,7 +46,7 @@ export default async function HomePage() {
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Link
             href="/create"
-            className="inline-flex items-center gap-2 rounded-lg bg-[color:var(--color-primary)] px-4 py-2 text-sm font-medium text-[color:var(--color-primary-foreground)] transition-colors duration-200 hover:bg-[#a85a24]"
+            className="inline-flex items-center gap-2 rounded-lg bg-[color:var(--color-primary)] px-4 py-2 text-sm font-medium text-[color:var(--color-primary-foreground)] transition-colors duration-200 hover:bg-[#24624A]"
           >
             Create Agent
           </Link>

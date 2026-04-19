@@ -23,10 +23,10 @@ Obs Forge is a public agent playground hosted at `forge.hirecody.dev`. Visitors 
 - **Integration with Obs:** All run, step, build, agent, and telemetry data lives in Obs. Forge talks to Obs via the endpoints in `FORGE_INTEGRATION.md`. That document is the source of truth for every API call this app makes.
 - **Real-time progress:** Polling, not SSE — `GET /api/forge/runs/[id]/steps?since=<last_seq>` every ~750ms (see integration doc §7.4).
 - **Styling:** Tailwind v4 (`@import 'tailwindcss'`) with CSS variables exposed via `@theme inline`. Palette inherited from `hirecody-chatbot`:
-  - `--background: #FAF7F2`, `--foreground: #2B2B2B`
-  - `--card: #F1E9DD`, `--border: #E5DDD0`, `--input: #E5DDD0`
-  - `--primary / --accent / --ring: #C56A2D` (signature orange)
-  - `--primary-foreground: #FAF7F2`, `--muted-foreground: #6B6B6B`
+  - `--background: #F1F6F2`, `--foreground: #15302A`
+  - `--card: #DCEBE2`, `--border: #C8DCD0`, `--input: #C8DCD0`
+  - `--primary / --accent / --ring: #2E7D5B` (signature mint-green)
+  - `--primary-foreground: #F1F6F2`, `--muted-foreground: #4F6B5F`
   - `--radius: 0.75rem`
   - Fonts: Inter (sans), Geist Mono (mono)
   - Reuse the `fadein` and `pulse-bar` keyframe utilities from the chatbot for new-card reveals and building-card pulsing.
@@ -203,7 +203,7 @@ User's agent description: "{user_prompt}"
 
   <a
     href="https://hirecody.dev"
-    className="absolute left-3 top-1/2 -translate-y-1/2 z-10 shrink-0 inline-flex items-center gap-2 rounded-md bg-[#C56A2D] px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-[#A85A24]"
+    className="absolute left-3 top-1/2 -translate-y-1/2 z-10 shrink-0 inline-flex items-center gap-2 rounded-md bg-[color:var(--color-primary)] px-3 py-1.5 text-sm font-bold text-[color:var(--color-primary-foreground)] transition-colors hover:bg-[#24624A]"
     aria-label="Back to hirecody.dev"
   >
     <ArrowLeft size={16} className="shrink-0" />
@@ -211,7 +211,7 @@ User's agent description: "{user_prompt}"
   </a>
   ```
   Hidden when `window.self !== window.top` (iframe embed detection — same pattern as the chatbot).
-- **UI/UX:** Same orange (`#C56A2D`), same hover (`#A85A24`), same arrow icon, same position on every page.
+- **UI/UX:** Same mint (`#2E7D5B`), same hover (`#24624A`), same arrow icon, same position on every page.
 
 ## Suggested Features (Approved)
 

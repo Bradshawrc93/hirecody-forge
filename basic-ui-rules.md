@@ -1,20 +1,20 @@
 # Design System — HireCody Portfolio
 
-Apply this design system consistently. It's a warm, editorial, minimal aesthetic — earthy palette, generous whitespace, restrained typography. Avoid flashy gradients, heavy shadows, dark mode, or any color outside this palette unless I explicitly ask.
+Apply this design system consistently. It's a fresh, editorial, minimal aesthetic — mint-green palette, generous whitespace, restrained typography. Avoid flashy gradients, heavy shadows, dark mode, or any color outside this palette unless I explicitly ask.
 
 ## Color Palette (light mode only)
 
 | Token | Hex | Use |
 |---|---|---|
-| `background` | `#FAF7F2` | Page background (warm off-white) |
-| `foreground` | `#2B2B2B` | Primary text (charcoal — never pure black) |
-| `card` / `secondary` / `muted` | `#F1E9DD` | Card surfaces, secondary backgrounds (sand) |
-| `panel` | `#EDE5D8` | Slightly deeper panels |
-| `card hover` | `#E4D8C5` | Card hover state |
-| `primary` / `accent` / `ring` | `#C56A2D` | Buttons, links, focus rings, brand accents (burnt orange) |
-| `primary-foreground` | `#FAF7F2` | Text on primary buttons |
-| `muted-foreground` | `#6B6B6B` | Secondary/supporting text |
-| `border` / `input` | `#E5DDD0` | All borders, inputs, dividers (soft warm) |
+| `background` | `#F1F6F2` | Page background (mint-tinted off-white) |
+| `foreground` | `#15302A` | Primary text (deep forest — never pure black) |
+| `card` / `secondary` | `#DCEBE2` | Card surfaces, secondary backgrounds (pale mint) |
+| `muted` | `#E5EFE8` | Muted backgrounds |
+| `panel` | `#D2E2D7` | Slightly deeper panels |
+| `primary` / `accent` / `ring` | `#2E7D5B` | Buttons, links, focus rings, brand accents (forest-mint) |
+| `primary-foreground` | `#F1F6F2` | Text on primary buttons |
+| `muted-foreground` | `#4F6B5F` | Secondary/supporting text (muted sage) |
+| `border` / `input` | `#C8DCD0` | All borders, inputs, dividers (soft mint) |
 
 Border radius scale: `--radius: 0.75rem` (12px) base. `sm` = 8px, `md` = 10px, `lg` = 12px, `xl` = 16px. Cards use `rounded-xl` (12px), zone containers use `rounded-2xl` (16px), buttons use `rounded-lg` (10px), pill tags use `rounded-full`.
 
@@ -71,7 +71,7 @@ transition-colors duration-200
 flex flex-col gap-3
 bg-card border border-border rounded-xl
 p-5 (or p-6 for emphasis)
-hover:bg-[#E4D8C5] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)]
+hover:bg-[#C2D6C9] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)]
 transition-all duration-200
 ```
 
@@ -98,10 +98,10 @@ transition-all duration-200
 
 ## Borders & Dividers
 
-- Default border: `border border-border` (the warm `#E5DDD0`).
+- Default border: `border border-border` (the soft mint `#C8DCD0`).
 - Subtle internal dividers: `border-border/60` (60% opacity for softer separation).
 - Horizontal rules: `<hr className="border-t border-border" />`.
-- Focus ring: `--ring: #C56A2D` (primary color).
+- Focus ring: `--ring: #2E7D5B` (primary color).
 
 ## Decorative Patterns (use sparingly)
 
