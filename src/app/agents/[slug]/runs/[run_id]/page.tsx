@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
@@ -6,7 +7,7 @@ import { MarkdownView } from "@/components/MarkdownView";
 import { Waterfall } from "@/components/Waterfall";
 import { RunStatusBadge } from "@/components/StatusBadge";
 import { findAgentBySlug } from "@/lib/agent-lookup";
-import { getRun, getSteps } from "@/lib/obs";
+import { getRun, getSteps, type RunStep } from "@/lib/obs";
 import { getAgentKey } from "@/lib/kv";
 import { formatCost, formatDuration, relativeTime } from "@/lib/format";
 import { explainFailure } from "@/lib/failure-explainer";
@@ -16,6 +17,28 @@ import { CsvDownloadBlock } from "@/components/CsvDownloadBlock";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+// Async island that fetches an LLM-generated plain-English failure
+// explanation. Wrapped in <Suspense> below so the rest of the page
+// renders without waiting on the Haiku call (~1-3s).
+async function FailureExplanation({
+  steps,
+  errorMessage,
+}: {
+  steps: RunStep[];
+  errorMessage: string | null;
+}) {
+  const summary = await explainFailure(steps, errorMessage);
+  return (
+    <div className="mt-6 flex items-start gap-2 rounded-xl border border-[#E5BFB5] bg-[#F4D6D2] p-4 text-sm leading-relaxed text-[#7A1F1A]">
+      <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+      <div>
+        <div className="font-semibold">Why did this fail?</div>
+        <div>{summary}</div>
+      </div>
+    </div>
+  );
+}
 
 export default async function RunDetailPage({
   params,
@@ -28,16 +51,16 @@ export default async function RunDetailPage({
   const apiKey = await getAgentKey(lean.app_id);
   if (!apiKey) notFound();
 
-  const { run } = await getRun(run_id, apiKey);
+  // Run + steps are independent on Obs's side; fetching them in parallel
+  // saves the second sequential round-trip. We don't yet know whether the
+  // run is "live" (queued/running, in which case the Waterfall component
+  // polls steps client-side and we don't need them server-side), but the
+  // extra fetch is cheap when it's not needed and saves ~500ms when it is.
+  const [{ run }, stepsResp] = await Promise.all([
+    getRun(run_id, apiKey),
+    getSteps(run_id, apiKey, 0).catch(() => ({ steps: [] })),
+  ]);
   const isLive = run.status === "queued" || run.status === "running";
-  const stepsResp = isLive
-    ? { steps: [] }
-    : await getSteps(run_id, apiKey, 0);
-
-  const failureSummary =
-    run.status === "failed"
-      ? await explainFailure(stepsResp.steps, run.error_message)
-      : null;
 
   return (
     <main className="relative min-h-screen">
@@ -80,14 +103,17 @@ export default async function RunDetailPage({
           </section>
         )}
 
-        {failureSummary && (
-          <div className="mt-6 flex items-start gap-2 rounded-xl border border-[#E5BFB5] bg-[#F4D6D2] p-4 text-sm leading-relaxed text-[#7A1F1A]">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-            <div>
-              <div className="font-semibold">Why did this fail?</div>
-              <div>{failureSummary}</div>
-            </div>
-          </div>
+        {run.status === "failed" && (
+          <Suspense
+            fallback={
+              <div className="mt-6 h-[68px] animate-pulse rounded-xl border border-[#E5BFB5] bg-[#F4D6D2]/60 p-4" />
+            }
+          >
+            <FailureExplanation
+              steps={stepsResp.steps}
+              errorMessage={run.error_message ?? null}
+            />
+          </Suspense>
         )}
 
         {isLive ? (
