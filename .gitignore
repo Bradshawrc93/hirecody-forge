@@ -12,3 +12,6 @@ next-env.d.ts
 
 # forge-cli local agent tracking
 scripts/.forge-cli-agents.json
+
+# Claude Code session-local state
+.claude/
