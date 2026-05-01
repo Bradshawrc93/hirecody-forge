@@ -42,6 +42,7 @@ The plan must use ONLY these step types:
 - "output": final markdown rendered for the user. Fields: name, template. Use this for standard text/markdown output.
 - "html_report": final self-contained HTML report rendered for the user. Fields: name, template. Use this INSTEAD of "output" when the agent should produce a visual report with charts, tables, or rich layout.
 - "csv_report": final CSV spreadsheet rendered for the user. Fields: name, template. Use this INSTEAD of "output" / "html_report" when output_type === "csv". The template MUST be literally "{{csv_data}}" — nothing else.
+- "image_gen": generates an image with OpenAI gpt-image-1 and stores a data URL in the output_var. Fields: name, prompt, output_var, optional size ("1024x1024" | "1024x1536" | "1536x1024", default "1024x1024"), optional quality ("low" | "medium" | "high", default "medium"). Use this when the user wants the agent to produce an image (social post graphic, illustration, diagram thumbnail, etc.). The output_var holds a complete "data:image/png;base64,..." URL — embed it in the final markdown with ![alt]({{image_var}}) so it renders. Always include a downstream "output" step that references the image var; image_gen is never a terminal step on its own.
 
 Every plan MUST end in exactly one terminal step: "output" (markdown), "html_report" (HTML), or "csv_report" (CSV). Never more than one.
 
