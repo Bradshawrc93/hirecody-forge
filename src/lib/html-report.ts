@@ -473,9 +473,17 @@ function injectChartInits(html: string, scripts: string): string {
 // survives sanitization.
 const MERMAID_PATTERN = /<pre[^>]*class\s*=\s*["'][^"']*\bmermaid\b[^"']*["'][^>]*>/i;
 const MERMAID_LIB_MARKER = "forge-mermaid-lib";
-// Pinned to a current major. Sandboxed iframe contains any drift; bump
-// the version here (not in the LLM prompt) when we want a newer release.
-const MERMAID_CDN_URL = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
+// Pinned to an exact version + Subresource Integrity hash so the browser
+// refuses to execute the script if jsdelivr or the upstream npm package
+// serves anything other than the bytes we vetted. To bump:
+//   1. curl -sL https://cdn.jsdelivr.net/npm/mermaid@<NEW>/dist/mermaid.min.js \
+//        | openssl dgst -sha384 -binary | openssl base64 -A
+//   2. Update both the URL version and the integrity hash here.
+//   3. Verify a Mermaid-bearing report still renders.
+const MERMAID_CDN_URL =
+  "https://cdn.jsdelivr.net/npm/mermaid@11.14.0/dist/mermaid.min.js";
+const MERMAID_CDN_INTEGRITY =
+  "sha384-1CMXl090wj8Dd6YfnzSQUOgWbE6suWCaenYG7pox5AX7apTpY3PmJMeS2oPql4Gk";
 
 // When the report uses Mermaid, inject the library + an init script that
 // finds every <pre class="mermaid"> and renders it. We use a CDN <script>
@@ -485,7 +493,10 @@ const MERMAID_CDN_URL = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.mi
 // CDN fails to load.
 function injectMermaidIfNeeded(html: string): string {
   if (!MERMAID_PATTERN.test(html)) return html;
-  const libTag = `<script data-forge="${MERMAID_LIB_MARKER}" src="${MERMAID_CDN_URL}"></script>`;
+  // crossorigin="anonymous" is required by browsers when an SRI hash is
+  // present on a cross-origin script — without it the integrity check
+  // is skipped and the script fails to execute.
+  const libTag = `<script data-forge="${MERMAID_LIB_MARKER}" src="${MERMAID_CDN_URL}" integrity="${MERMAID_CDN_INTEGRITY}" crossorigin="anonymous"></script>`;
   const initTag = `<script data-forge="${MERMAID_LIB_MARKER}-init">
 (function(){
   function __init(){
