@@ -359,6 +359,33 @@ async function cmdInspect(args) {
   console.log(JSON.stringify(detail, null, 2));
 }
 
+async function cmdRename(args) {
+  const app_id = args._[1];
+  if (!app_id) throw new Error("usage: rename <app_id> [--name <new>] [--slug <new>]");
+  const display_name = args.flags.name;
+  const slug = args.flags.slug;
+  if (!display_name && !slug) {
+    throw new Error("provide --name and/or --slug");
+  }
+  const result = await post("/api/internal/rename-agent", {
+    app_id,
+    display_name,
+    slug,
+  });
+  if (!result.ok) {
+    console.error(
+      `[forge-cli] rename returned but the change did not take effect.\n` +
+        `  requested: name=${result.requested?.display_name ?? "(unchanged)"} slug=${result.requested?.slug ?? "(unchanged)"}\n` +
+        `  observed:  name=${result.observed?.display_name} slug=${result.observed?.slug}\n` +
+        `Likely cause: Obs's PATCH /api/forge/agents/{id} does not accept display_name/slug.`
+    );
+  } else {
+    console.error(`[forge-cli] renamed agent ${app_id}`);
+  }
+  console.log(JSON.stringify(result, null, 2));
+  if (!result.ok) process.exit(4);
+}
+
 async function cmdDelete(args) {
   const app_id = args._[1];
   if (!app_id) throw new Error("usage: delete <app_id>");
@@ -385,12 +412,13 @@ const COMMANDS = {
   rebuild: cmdRebuild,
   finalize: cmdFinalize,
   inspect: cmdInspect,
+  rename: cmdRename,
   delete: cmdDelete,
   tracked: cmdTracked,
 };
 
 if (!cmd || !COMMANDS[cmd]) {
-  console.error("commands: create, test, rebuild, finalize, inspect, delete, tracked");
+  console.error("commands: create, test, rebuild, finalize, inspect, rename, delete, tracked");
   process.exit(1);
 }
 
