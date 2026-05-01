@@ -103,6 +103,16 @@ Chart canvas sizing (CRITICAL — charts render blank otherwise):
 - Keep wrappers modest: 220–320px tall is typical for a single chart. Side-by-side charts in a flex row each get their own wrapper with the same explicit height.
 - Do NOT set width/height attributes on the <canvas> itself — let the wrapper drive size. The canvas will fill its wrapper.
 
+MERMAID DIAGRAMS (inside html_report HTML):
+The "html" string MAY contain one or more <pre class="mermaid">...</pre> blocks. The server detects these, loads the Mermaid library into the report iframe, and renders each block to an inline SVG diagram. Use this for flowcharts, sequence diagrams, swimlanes, state machines, and SOP-style process diagrams — anything Lucidchart would draw.
+
+Rules:
+- Inner text is raw Mermaid syntax (no HTML escaping, no surrounding tags). Example body: "flowchart TD\\n  A[Start] --> B{Decision}\\n  B -- yes --> C[Step]\\n  B -- no --> D[End]".
+- Wrap the <pre class="mermaid"> in a sized container, e.g. <div style="max-width:900px;margin:1em auto;">, so the rendered SVG has comfortable layout.
+- Prefer "flowchart TD" or "flowchart LR" for SOPs; "sequenceDiagram" for handoff/comms processes.
+- Keep node labels short — one short phrase per node. Long labels break the layout.
+- Do NOT add a <script> tag for mermaid; the server injects it. Do NOT use markdown code fences inside the HTML; just put the raw text inside <pre class="mermaid">.
+
 Sketch of the LLM step's prompt for an html_report agent:
   "You are generating a structured HTML report. Analyze the data below and produce a JSON object with exactly two top-level keys: 'html' (a complete <!doctype html> document with <canvas id='chart-N'></canvas> placeholders and NO <script> tags) and 'charts' (an array of Chart.js specs, one per canvas). Each chart spec has canvas_id, type (one of bar/line/pie/doughnut), data (labels + datasets with hard-coded numbers), and optional options. Output ONLY the JSON object — no prose, no code fences. Data: {{file_1}}"
 
