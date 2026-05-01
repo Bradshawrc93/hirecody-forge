@@ -13,9 +13,9 @@ export function BackButton() {
   if (!show) return null;
   return (
     <a
-      href="https://www.hirecody.dev/apps#probes"
-      className="shrink-0 inline-flex items-center gap-2 rounded-md bg-[color:var(--color-primary)] px-3 py-1.5 text-sm font-bold text-[color:var(--color-primary-foreground)] transition-colors hover:bg-[#24624A]"
-      aria-label="Back to hirecody.dev/apps"
+      href="https://hirecody.dev/#artifacts"
+      className="shrink-0 inline-flex items-center gap-2 rounded-md bg-[color:var(--color-foreground)] px-3 py-1.5 text-sm font-bold text-[color:var(--color-background)] transition-colors hover:bg-[rgba(17,17,17,0.85)]"
+      aria-label="Back to hirecody.dev"
     >
       <ArrowLeft size={16} className="shrink-0" />
       <span>Back</span>

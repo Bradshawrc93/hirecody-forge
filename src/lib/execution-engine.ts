@@ -30,7 +30,7 @@ function markdownToEmailHtml(md: string): string {
 // Linking is more reliable than inlining Chart.js-heavy HTML into Gmail.
 function reportNotificationEmailHtml(agentName: string, reportUrl: string): string {
   const safeName = agentName.replace(/[<>&"']/g, "");
-  return `<!doctype html><html><body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a;background:#ffffff;"><div style="max-width:640px;margin:0 auto;"><p style="margin:0 0 16px;">Your ${safeName} report is ready.</p><p style="margin:16px 0;"><a href="${reportUrl}" style="display:inline-block;background:#2E7D5B;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Report</a></p><p style="margin:16px 0 0;font-size:12px;color:#666;">This link opens the full interactive report in your browser.</p></div></body></html>`;
+  return `<!doctype html><html><body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a;background:#ffffff;"><div style="max-width:640px;margin:0 auto;"><p style="margin:0 0 16px;">Your ${safeName} report is ready.</p><p style="margin:16px 0;"><a href="${reportUrl}" style="display:inline-block;background:#111111;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Report</a></p><p style="margin:16px 0 0;font-size:12px;color:#666;">This link opens the full interactive report in your browser.</p></div></body></html>`;
 }
 
 // Short notification email for CSV output. The Obs email API does not
@@ -46,7 +46,7 @@ function csvNotificationEmailHtml(
 ): string {
   const safeName = agentName.replace(/[<>&"']/g, "");
   const safeFilename = filename.replace(/[<>&"']/g, "");
-  return `<!doctype html><html><body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a;background:#ffffff;"><div style="max-width:640px;margin:0 auto;"><p style="margin:0 0 16px;">Your ${safeName} CSV is ready. ${rowCount} rows, ${columnCount} columns.</p><p style="margin:16px 0;"><a href="${downloadUrl}" style="display:inline-block;background:#2E7D5B;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Download CSV</a></p><p style="margin:16px 0 0;font-size:12px;color:#666;">${safeFilename}</p></div></body></html>`;
+  return `<!doctype html><html><body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a;background:#ffffff;"><div style="max-width:640px;margin:0 auto;"><p style="margin:0 0 16px;">Your ${safeName} CSV is ready. ${rowCount} rows, ${columnCount} columns.</p><p style="margin:16px 0;"><a href="${downloadUrl}" style="display:inline-block;background:#111111;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Download CSV</a></p><p style="margin:16px 0 0;font-size:12px;color:#666;">${safeFilename}</p></div></body></html>`;
 }
 
 export interface ExecutionFile {

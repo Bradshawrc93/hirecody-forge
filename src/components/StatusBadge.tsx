@@ -6,9 +6,9 @@ const AGENT_STYLES: Record<AgentStatus, { label: string; bg: string; fg: string 
   awaiting_test: { label: "Awaiting test", bg: "#F4E7C8", fg: "#6B4F11" },
   test_failed: { label: "Test failed", bg: "#F4D6D2", fg: "#7A1F1A" },
   active: { label: "Active", bg: "#FFFFFF", fg: "#2E7D5B" },
-  paused: { label: "Paused", bg: "#C8DCD0", fg: "#15302A" },
-  expired: { label: "Expired", bg: "#C8DCD0", fg: "#4F6B5F" },
-  deleted: { label: "Deleted", bg: "#C8DCD0", fg: "#4F6B5F" },
+  paused: { label: "Paused", bg: "#DCDFD8", fg: "#111111" },
+  expired: { label: "Expired", bg: "#DCDFD8", fg: "#5E665F" },
+  deleted: { label: "Deleted", bg: "#DCDFD8", fg: "#5E665F" },
 };
 
 const RUN_STYLES: Record<RunStatus, { label: string; bg: string; fg: string }> = {

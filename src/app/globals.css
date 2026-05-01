@@ -2,23 +2,23 @@
 
 @theme inline {
   --color-background: #f6f7f5;
-  --color-foreground: #15302a;
-  --color-card: #dcebe2;
-  --color-card-foreground: #15302a;
+  --color-foreground: #111111;
+  --color-card: #eaede7;
+  --color-card-foreground: #111111;
   --color-popover: #f6f7f5;
-  --color-popover-foreground: #15302a;
-  --color-secondary: #dcebe2;
-  --color-secondary-foreground: #15302a;
-  --color-muted: #e5efe8;
-  --color-muted-foreground: #4f6b5f;
-  --color-border: #c8dcd0;
-  --color-input: #c8dcd0;
+  --color-popover-foreground: #111111;
+  --color-secondary: #eaede7;
+  --color-secondary-foreground: #111111;
+  --color-muted: #eceee8;
+  --color-muted-foreground: #5e665f;
+  --color-border: #dcdfd8;
+  --color-input: #dcdfd8;
   --color-primary: #2e7d5b;
   --color-primary-foreground: #f1f6f2;
   --color-accent: #2e7d5b;
   --color-accent-foreground: #f1f6f2;
   --color-ring: #2e7d5b;
-  --color-panel: #d2e2d7;
+  --color-panel: #e2e5df;
   --color-success: #4f8a4f;
   --color-danger: #b3413a;
   --radius: 0.75rem;
@@ -87,8 +87,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--color-primary);
-  color: var(--color-primary-foreground);
+  background: var(--color-foreground);
+  color: var(--color-background);
   border-radius: 0.625rem;
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
@@ -96,7 +96,7 @@ body {
   transition: background-color 0.2s;
 }
 .btn-primary:hover {
-  background: #24624a;
+  background: rgba(17, 17, 17, 0.85);
 }
 .btn-primary:disabled {
   opacity: 0.55;

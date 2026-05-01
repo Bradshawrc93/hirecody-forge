@@ -132,29 +132,31 @@ export default async function AgentDetailPage({
                 Latest Run
               </h2>
               {latest ? (
-                <div className="card relative p-5 transition-all duration-200 hover:bg-[#C2D6C9] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)]">
+                <div className="card relative p-5 transition-all duration-200 hover:bg-[#DADDD6] hover:shadow-[inset_0_2px_6px_rgba(0,0,0,0.08)]">
                   <Link
                     href={`/agents/${slug}/runs/${latest.id}`}
                     aria-label="Open latest run"
                     className="absolute inset-0 rounded-[inherit]"
                   />
-                  <div className="relative flex items-center justify-between">
+                  <div className="pointer-events-none relative flex items-center justify-between">
                     <RunStatusBadge status={latest.status} />
                     <span className="text-xs text-[color:var(--color-muted-foreground)]">
                       {relativeTime(latest.created_at)}
                     </span>
                   </div>
-                  <div className="relative mt-3 flex items-center justify-between gap-4 text-xs text-[color:var(--color-muted-foreground)]">
+                  <div className="pointer-events-none relative mt-3 flex items-center justify-between gap-4 text-xs text-[color:var(--color-muted-foreground)]">
                     <div className="flex gap-4">
                       <span>{formatDuration(latest.duration_ms)}</span>
                       <span>{formatCost(latest.cost_usd)}</span>
                     </div>
                     {latest.status === "completed" && (
-                      <RunFeedback
-                        appId={app.id}
-                        runId={latest.id}
-                        initialVote={latest.user_rating ?? null}
-                      />
+                      <span className="pointer-events-auto">
+                        <RunFeedback
+                          appId={app.id}
+                          runId={latest.id}
+                          initialVote={latest.user_rating ?? null}
+                        />
+                      </span>
                     )}
                   </div>
                 </div>
@@ -179,7 +181,7 @@ export default async function AgentDetailPage({
                     <li key={r.id}>
                       <Link
                         href={`/agents/${slug}/runs/${r.id}`}
-                        className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#C2D6C9]"
+                        className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#DADDD6]"
                       >
                         <RunStatusBadge status={r.status} />
                         <span className="text-[color:var(--color-muted-foreground)]">
