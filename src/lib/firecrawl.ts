@@ -65,7 +65,9 @@ export async function firecrawlSearch(
       limit: Math.max(1, Math.min(limit, 10)),
       scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
     },
-    45000
+    // Search + per-result scrape can run long for broad queries; 45s was
+    // tight enough that prospect-discovery agents timed out. Give it room.
+    90000
   );
   const raw = Array.isArray(json.data)
     ? json.data

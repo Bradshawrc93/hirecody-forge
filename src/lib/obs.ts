@@ -211,6 +211,8 @@ export function patchAgent(
     schedule_day_of_month: number | null;
     verified_email: string;
     last_run_at: string;
+    display_name: string;
+    slug: string;
   }>
 ): Promise<{ agent: AgentRecord }> {
   return request(`/api/forge/agents/${appId}`, {

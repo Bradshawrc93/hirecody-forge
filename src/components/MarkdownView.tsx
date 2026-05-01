@@ -13,6 +13,17 @@ export function MarkdownView({ content, className }: Props) {
       className={`markdown-body text-sm leading-relaxed ${className ?? ""}`}
     >
       <ReactMarkdown
+        urlTransform={(url) => {
+          // react-markdown's default urlTransform strips every data: URI as
+          // an XSS guard, which also blocks data:image/* used by image_gen.
+          // Allow image data URLs through but keep the guard for the real
+          // attack vectors (data:text/html, data:application/javascript).
+          if (/^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml);base64,/i.test(url)) {
+            return url;
+          }
+          if (/^(https?:|mailto:|tel:|#|\/)/i.test(url)) return url;
+          return "";
+        }}
         components={{
           a: (props) => (
             <a

@@ -467,6 +467,66 @@ function injectChartInits(html: string, scripts: string): string {
   return html + "\n" + scripts;
 }
 
+// Detect whether the report contains any Mermaid diagram blocks. The LLM
+// emits diagrams as <pre class="mermaid">graph TD; ...</pre>; sanitize-html
+// keeps both the tag and the class on its allowlist, so the marker
+// survives sanitization.
+const MERMAID_PATTERN = /<pre[^>]*class\s*=\s*["'][^"']*\bmermaid\b[^"']*["'][^>]*>/i;
+const MERMAID_LIB_MARKER = "forge-mermaid-lib";
+// Pinned to a current major. Sandboxed iframe contains any drift; bump
+// the version here (not in the LLM prompt) when we want a newer release.
+const MERMAID_CDN_URL = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
+
+// When the report uses Mermaid, inject the library + an init script that
+// finds every <pre class="mermaid"> and renders it. We use a CDN <script>
+// tag rather than bundling the 3MB mermaid library into Forge — the report
+// renders inside a sandboxed iframe so the script can only touch the
+// report DOM. Falls back to leaving the mermaid source visible if the
+// CDN fails to load.
+function injectMermaidIfNeeded(html: string): string {
+  if (!MERMAID_PATTERN.test(html)) return html;
+  const libTag = `<script data-forge="${MERMAID_LIB_MARKER}" src="${MERMAID_CDN_URL}"></script>`;
+  const initTag = `<script data-forge="${MERMAID_LIB_MARKER}-init">
+(function(){
+  function __init(){
+    if (typeof mermaid === 'undefined') {
+      if (typeof __forgeBanner === 'function') __forgeBanner('mermaid library failed to load');
+      return;
+    }
+    try {
+      mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict', flowchart: { htmlLabels: true, useMaxWidth: true } });
+      mermaid.run({ querySelector: 'pre.mermaid' }).catch(function(e){
+        console.error('[forge] mermaid render failed:', e);
+        if (typeof __forgeBanner === 'function') __forgeBanner('mermaid: ' + (e && e.message ? e.message : e));
+      });
+    } catch (e) {
+      console.error('[forge] mermaid init failed:', e);
+      if (typeof __forgeBanner === 'function') __forgeBanner('mermaid init: ' + (e && e.message ? e.message : e));
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', __init);
+  } else {
+    __init();
+  }
+})();
+</script>`;
+  // Library tag goes in <head>; init tag at end of body so all <pre>
+  // blocks exist when it runs.
+  let withLib: string;
+  if (/<head[^>]*>/i.test(html)) {
+    withLib = html.replace(/<head([^>]*)>/i, `<head$1>${libTag}`);
+  } else if (/<html[^>]*>/i.test(html)) {
+    withLib = html.replace(/<html([^>]*)>/i, `<html$1><head>${libTag}</head>`);
+  } else {
+    withLib = `<!doctype html><html><head>${libTag}</head><body>${html}</body></html>`;
+  }
+  if (/<\/body\s*>/i.test(withLib)) {
+    return withLib.replace(/<\/body\s*>/i, `${initTag}\n</body>`);
+  }
+  return withLib + "\n" + initTag;
+}
+
 // Pull every `<script>...new Chart(...)...</script>` out of the raw HTML
 // before sanitization and return the stripped HTML + the extracted
 // bodies. This is the legacy path: the LLM hand-authored inline chart
@@ -536,7 +596,8 @@ export function prepareHtmlReport(rawOutput: string): string {
   // Post-sanitization injection. Library + shim go in <head>; init
   // scripts go right before </body> so canvases exist when they run.
   const withLib = injectChartJs(clean);
-  const final = injectChartInits(withLib, initScriptsHtml);
+  const withCharts = injectChartInits(withLib, initScriptsHtml);
+  const final = injectMermaidIfNeeded(withCharts);
 
   // Sanitization strips the doctype (it's not a tag). Prepend one so the
   // iframe renders in standards mode.

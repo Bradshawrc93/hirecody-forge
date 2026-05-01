@@ -50,6 +50,16 @@ export type PlanStep =
       type: "csv_report";
       name: string;
       template: string;
+    }
+  | {
+      type: "image_gen";
+      name: string;
+      prompt: string;
+      output_var?: string;
+      // gpt-image-1 supported sizes; defaults to "1024x1024".
+      size?: "1024x1024" | "1024x1536" | "1536x1024";
+      // gpt-image-1 quality tier; defaults to "medium".
+      quality?: "low" | "medium" | "high";
     };
 
 export interface AgentPlan {

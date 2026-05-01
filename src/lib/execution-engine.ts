@@ -183,6 +183,29 @@ async function runWebFetchStep(
   return truncateWebContent(await res.text());
 }
 
+// Generate an image with OpenAI gpt-image-1. Returns a data URL string so
+// it can be embedded directly in markdown / html_report output. Token
+// counts on this provider don't apply — cost is fixed per image and not
+// charged through Obs's LLM event pipeline yet.
+async function runImageGenStep(
+  step: Extract<PlanStep, { type: "image_gen" }>,
+  vars: Record<string, string>
+): Promise<string> {
+  const prompt = render(step.prompt, vars);
+  const size = step.size ?? "1024x1024";
+  const quality = step.quality ?? "medium";
+  const res = await openai().images.generate({
+    model: "gpt-image-1",
+    prompt,
+    size,
+    quality,
+    n: 1,
+  });
+  const b64 = res.data?.[0]?.b64_json;
+  if (!b64) throw new Error("image_gen returned no image data");
+  return `data:image/png;base64,${b64}`;
+}
+
 async function runWebSearchStep(
   step: Extract<PlanStep, { type: "web_search" }>,
   vars: Record<string, string>
@@ -321,6 +344,11 @@ export async function executeAgent(
         startMeta.bytes = filesArr.reduce((n, f) => n + (f.content?.length ?? 0), 0);
         startMeta.file_count = filesArr.length;
         if (step.output_var) startMeta.output_var = step.output_var;
+      } else if (step.type === "image_gen") {
+        startMeta.prompt_preview = render(step.prompt, vars).slice(0, 400);
+        startMeta.size = step.size ?? "1024x1024";
+        startMeta.quality = step.quality ?? "medium";
+        if (step.output_var) startMeta.output_var = step.output_var;
       }
 
       await postStep(runId, apiKey, {
@@ -348,6 +376,9 @@ export async function executeAgent(
           if (step.output_var) vars[step.output_var] = producedOutput;
         } else if (step.type === "web_search") {
           producedOutput = await runWebSearchStep(step, vars);
+          if (step.output_var) vars[step.output_var] = producedOutput;
+        } else if (step.type === "image_gen") {
+          producedOutput = await runImageGenStep(step, vars);
           if (step.output_var) vars[step.output_var] = producedOutput;
         } else if (step.type === "file_read") {
           // Concatenate all files with clear labels so the LLM sees each
@@ -436,9 +467,15 @@ export async function executeAgent(
         }
 
         const stepDuration = Date.now() - stepStart;
+        // image_gen produces a 1-2MB base64 data URL; persisting that into
+        // the step metadata blows up the run waterfall payload. Strip the
+        // payload to a short marker so the waterfall stays fast.
+        const isImageGen = step.type === "image_gen";
         const completeMeta: Record<string, unknown> = {
           type: step.type,
-          output_preview: producedOutput?.slice(0, 1200) ?? "",
+          output_preview: isImageGen
+            ? `[image: ${(producedOutput?.length ?? 0).toLocaleString()} bytes data URL]`
+            : producedOutput?.slice(0, 1200) ?? "",
           output_chars: producedOutput?.length ?? 0,
         };
         if (step.type === "llm") {
@@ -449,6 +486,9 @@ export async function executeAgent(
         } else if (step.type === "web_search") {
           completeMeta.query = render(step.query, vars);
           completeMeta.max_results = step.max_results ?? 5;
+        } else if (step.type === "image_gen") {
+          completeMeta.size = step.size ?? "1024x1024";
+          completeMeta.quality = step.quality ?? "medium";
         } else if (step.type === "html_report") {
           completeMeta.output_type = "html_report";
         } else if (step.type === "csv_report") {
