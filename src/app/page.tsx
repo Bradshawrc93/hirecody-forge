@@ -20,8 +20,6 @@ async function loadAgents(): Promise<AgentRecord[]> {
 
 export default async function HomePage() {
   const agents = await loadAgents();
-  const owner = agents.filter((a) => a.creator_type === "owner");
-  const community = agents.filter((a) => a.creator_type !== "owner");
 
   return (
     <main className="relative min-h-screen">
@@ -41,7 +39,8 @@ export default async function HomePage() {
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--color-muted-foreground)]">
           A playground for building and running custom agents. Build one, watch
-          it work, see the telemetry.
+          it work, see the telemetry. Please feel free to create an agent if
+          you would like.
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Link
@@ -60,28 +59,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-6 pb-16">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide">
-          Built by Cody
-        </h2>
-        {owner.length === 0 ? (
-          <p className="text-sm leading-relaxed text-[color:var(--color-muted-foreground)]">
-            No owner-curated agents yet.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {owner.map((a) => (
-              <AgentCard key={a.app_id} agent={a} />
-            ))}
-          </div>
-        )}
-      </section>
-
       <section className="mx-auto max-w-5xl px-6 pb-24">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide">
-          Community Agents
+          Agents
         </h2>
-        {community.length === 0 ? (
+        {agents.length === 0 ? (
           <p className="text-sm leading-relaxed text-[color:var(--color-muted-foreground)]">
             Be the first — click{" "}
             <span className="text-[color:var(--color-foreground)]">
@@ -91,7 +73,7 @@ export default async function HomePage() {
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {community.map((a) => (
+            {agents.map((a) => (
               <AgentCard key={a.app_id} agent={a} />
             ))}
           </div>
