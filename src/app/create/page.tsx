@@ -110,7 +110,7 @@ export default function CreatePage() {
               </div>
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] transition-colors duration-200 hover:bg-[color:var(--color-card)]"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] transition-colors duration-200 hover:bg-[color:var(--color-card)]"
                 onClick={handleCancel}
               >
                 Cancel

@@ -93,6 +93,7 @@ body {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
+  cursor: pointer;
   transition: background-color 0.2s;
 }
 .btn-primary:hover {
@@ -114,6 +115,7 @@ body {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
+  cursor: pointer;
   transition: background-color 0.2s;
 }
 .btn-secondary:hover {
